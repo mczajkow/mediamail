@@ -1,0 +1,23 @@
+{
+	'filters' : {
+		'whitelist_words' : [],
+		'blacklist_words' : []
+	},
+	'locality' : {
+		'local_towns' : [],
+		'state_abbreviation' : '',
+		'state_full' : ''
+	},
+	'queries' : {
+		'aois' : [],
+		'followers' : [],
+		'tracks' : []
+	}
+	'twitter' : {
+		'access_token' : '',
+		'access_token_secret' : '',
+		'consumer_key' : '',
+		'consumer_secret' : '',
+		'my_twitter_handle'' : ''
+	}
+}
