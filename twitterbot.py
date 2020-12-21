@@ -13,13 +13,20 @@ class TwitterBot:
     @author: Michael
     '''
     
-     def __init__(self, configFile):         
-         '''
+    def __init__(self, configFile):         
+        '''
          Initializes the TwitterBot, loading the configuration file. Then starts the query to Twitter.
-         '''
+         
+        -- configFile string, the location of the configuration JSON used to configure this bot instance. Required, without it an error log is made and nothing happens further
+        '''
+        if configFile is None:
+            log.error("Could not initialize TwitterBot with None config file")
+            return
+        log.info("Initializing TwitterBot with config file: "+configFile)
     
 def get_args():
     '''
+    Uses ArgumentParser to pull options off the command line for use by TwitterBot    
     '''
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -35,13 +42,17 @@ def get_args():
 
 def main():
     '''
+    Starts a TwitterBot instance given options off the command line using ArgumentParser
+    
+    @see get_args
     '''
     options = get_args()
     jaraco.logging.setup(options)
-    log.info("Starting Twitterbot")
-    TwitterBot tb = TwitterBot()
+    tb = TwitterBot(options.config_file)
 
 if __name__ == "__main__":
     '''
+    This is a catch-all so that this file may be used as an entry point from Python, e.g. 'python twitterbot.py'
     '''
+    # Merely call main, which then parses arguments and sets up the bot
     main()
