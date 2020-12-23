@@ -54,12 +54,45 @@ class TwitterBot(StreamListener):
             return
         if 'aois' in self.conf['queries']:
             log.info('Setting up an aoi query to Twitter')
-            # For it to be valid it has to have at least one bounding box, e.g. length >= 4
+            # For it to be valid it has to have at least one bounding box, e.g. length >= 4 and the length should be modulo 4 = 0.
+            locations = self.conf['queries']['aois']
+            if len(locations) % 4 != 0:
+                log.error('The configured aois to query for Twitter are not valid. The list should contain quadruplets of floating values. Instead, it has partial bounding boxes in it. See DESIGN.md for more information. No query to Twitter is made.')
+                return
+            elif len(locations) == 0:
+                log.error('The configured aois to query for Twitter are not valid. The list should contain quadruplets of floating values. Instead, it has nothing in it. See DESIGN.md for more information. No query to Twitter is made.')
+                return
+            # Each of these has to be made into a string for Twitter to process it via Tweepy.
+            stringLocations = []
+            for floatLocation in locations:
+                stringLoations += str(floatLoation)
+            log.debug('Calling filter on Twitter with locations: '+str(stringLocations))
+            self.myStream.filter(locations=stringLocations, is_async=True)
+            log.debug('Filter set! Twitter is now scanning these aois.')
         elif 'followers' in self.conf['queries']:
             log.info('Setting up a follower query to Twitter')
+            # We have to have at least one follower integer ID in there for this to work.
+            followers = self.conf['queries']['followers']
+            if len(followers) == 0:
+                log.error('The configured followers list to query is empty. It needs to have at least one Twitter ID. See DESIGN.md. No query to Twitter is made')
+                return
+            # Each of these needs to be made into a string for Twitter to process it via Tweepy
+            stringFollowers = []
+            for intFollower in followers:
+                stringFollowers += [str(intFollower)]
+            log.debug('Calling filter on Twitter with followers: '+str(stringFollowers))
+            self.myStream.filter(follow=stringFollowers, is_async=True)
+            log.debug('Filter set! Twitter is now scanning these followers.')
         elif 'tracks' in self.conf['queries']:
             log.info('Setting up a tracks query to Twitter')
-        
+            tracks = self.conf['queries']['tracks']
+            # We have to have at least one track in there for this to work.
+            if len(tracks) == 0:
+                log.error('The configured tracks list to query is empty. It needs to have at least one key word. See DESIGN.md. No query to Twitter is made')
+                return
+            log.debug('Calling filter on Twitter with tracks: '+str(tracks))            
+            self.myStream.filter(track=tracks, is_async=True)
+            log.debug('Filter set! Twitter is now scanning these tracks.')
             
      def on_data(self, data):
         """        
