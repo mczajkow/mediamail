@@ -1,5 +1,6 @@
 import logging
 import json
+from builtins import None
 
 log = logging.getLogger(__name__)
 
@@ -45,9 +46,13 @@ class ConfigFileHelper:
         '''
         Returns the global configuration dictionary stored in memory in this class instance.
         
-        @return dictionary
+        @return dictionary, the configuration loaded by this file. May be empty, but is never None
         '''
         return self.conf
+
+class ElasticSearchHelper:
+    '''
+    '''
     
 class TwitterHelper:
     '''
@@ -66,3 +71,34 @@ class TwitterHelper:
             return
         self.conf = config
         
+    def getTweetText(self, jsonDataString):
+        '''
+        Looks at the content of incoming tweet data in a JSON formatted string and pulls out the raw text found within.
+        
+        -- jsonDataString string, the JSON data from a tweet. Required, if None is passed then None is returned. If it is bad JSON, an error is thrown and None is returned.
+        @return string, the raw full tweet text contained therein. None is returned jsonDataString has bad/unexpected content or there really is no tweet raw text in it.
+        '''
+        if jsonDataString is None:
+            log.info('Tweet contains no text within it, the jsonDataString given was None.')
+            return None
+        try:
+            dict_data = json.loads(data)
+        except Exception as e:
+            log.warn('Failed to load the tweet JSON: '+str(e))
+            return None
+        if "extended_tweet" in dict_data:
+            # Special class of Tweets have their data in this location. Check here first.
+           return dict_data['extended_tweet']['full_text']
+        elif 'retweeted_status' in dict_data:
+            # Retweets have their text data somewhere else.
+            if 'extended_tweet' in dict_data['retweeted_status'] and 'full_text' in dict_data['retweeted_status']['extended_tweet']:
+                return dict_data['retweeted_status']['extended_tweet']['full_text']
+        # Otherwise, try just 'text' at the top level.
+        try:
+            return dict_data['text']
+        except Exception as e:
+            # Some kind of error in getting the data.
+            log.warn('Failed to find the text in the tweet because of an error: '+str(e))
+            return None
+        log.info('Tweet contains no text that could be found.')
+        return None

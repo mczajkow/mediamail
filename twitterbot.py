@@ -93,20 +93,43 @@ class TwitterBot(StreamListener):
             log.debug('Calling filter on Twitter with tracks: '+str(tracks))            
             self.myStream.filter(track=tracks, is_async=True)
             log.debug('Filter set! Twitter is now scanning these tracks.')
+        # Set up an error counter to track consecutive errors
+        self.twitterErrorCounter = 0
             
-     def on_data(self, data):
+    def on_data(self, data):
         """        
-        Processes a new Twitter message, convert it to TwJSON and send it to IRCBot.
-        
-        -- data is a JSON string that comes in from Twitter.
-        """
+        Processes a new Twitter message and then stores it in Elastic Search using the ElasticSearchHelper
+
+        -- data string, a JSON string that comes in from Twitter. Required, if None a warning will be logged and nothing else will happen.
+        @see utils.ElasticSearchHelper
+        """        
+        if data is None:
+            log.warn('Incoming data from Twitter was None. Ignoring')
+            return
+        # Pull out the text.
+        tweetText = self.twitterHelper.getTweetText(data)
+        # This could be None, check.
+        if tweetText is None:
+            # It would be difficult to process a tweet with no text, so ignore that too.
+            log.warn('Incoming data from Twitter had no text in the tweet. Ignoring')
+        log.debug('Incoming tweet, text: '+tweetText)
+        # Reset the self.twitterErrorCounter to zero. We have something that is good.
+        self.twitterErrorCounter = 0
     
     def on_error(self, status):
         """
-        Processes error messages in the Handler.
+        Processes error messages that come from Twitter via the use of the query.
         
-        -- status is a string error message.
+        -- status unknown type, this is an error message. Required, if None nothing will happen.
         """
+        if status is None:
+            return
+        log.debug('Incoming error from the Twitter query issued: '+str(status))
+        if self.twitterErrorCounter >= 3:
+            # Log this at error if we're getting a lot of consecutive errors
+            log.error('Receiving consistent errors from Twitter. Suggest restarting. Error is: '+str(status))
+        else:
+            self.twitterErrorCounter += 1
     
 def get_args():
     '''
