@@ -48,3 +48,21 @@ class ConfigFileHelper:
         @return dictionary
         '''
         return self.conf
+    
+class TwitterHelper:
+    '''
+    This class performs common Twitter functions needed by bots that interact with this social media platform.
+    @author: Michael
+    '''
+    def __init__(self, config):
+        '''
+        Sets up the TwitterHelper using the configuration loaded from a file
+        
+        -- config dictionary, the loaded properties from the configuration files for the bot. Required, if None then an error is logged and nothing happens.
+        @see ConfigFileHelper
+        '''
+        if config is None:
+            log.error('Failed to initialize TwitterHelper as provided config dictionary is None. TwitterHelper is not set up properly.')
+            return
+        self.conf = config
+        
