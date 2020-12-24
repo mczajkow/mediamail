@@ -1,5 +1,7 @@
 import logging
 import json
+from _tkinter import create
+from builtins import None
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +53,113 @@ class ConfigFileHelper:
 
 class ElasticSearchHelper:
     '''
+    ElasticSearchHelper provides functions to access and store data to Elastic Search for any bot to use.
+    @author: Michael
     '''
+    
+    def storeData(self, author=None, authorLocation=None, authorScreenName='Unknown', createdAt=None, hashtags=[], localityConfidence=0.0, location='', placeName=None, placeFullName=None, polarity=None, references=[], source=None, sentiment=None, subjectivity=None, text=None, tokens=[])
+        '''
+        Stores data given into ElasticSearch.
+        
+        -- author string, the name of the author. Optional, not required to be put into the index.
+        -- authorLocation string, the location of the author. Optional, not required to put into the index.
+        -- authorScreenName string, the social media handle or screen name. Optional, if not provided then 'Unknown' is used.
+        -- createdAt string, the date and time the tweet was made in ISO 8601 format. Required, without it we can't really query it back. If not provided then a DEBUG log will be made and nothing done. ISO 8601 formatting is not enforced by this method. Providing anything else would cause the message to be indexed but never found in a time based query.
+        -- hashtags list of string, the hashtags used within the body of the message (e.g. #fun). Optional, if not provided then an empty list is indexed.
+        -- locatlityConfidence float, a number from 0.0 to 1.0 indicating the confidence on how local to the configured location this author is physically. Required, default is 0.0. If a non-number or out of range number is provided, then a DEBUG log will be made and nothing done.
+        -- placeName string, the name of the place the author of the message is. Optional, not required to be put into the index.
+        -- placeNameFull string, the full unabbreviated place name the author of the message is. Optional not required to be put into the index.
+        -- polatity float, a number -1.0 to 1.0. @see https://en.wikipedia.org/wiki/Sentiment_analysis. Optional, not required to be put in the index. If provided, it must be a float type and within the range. If not, it will not be put into the index.
+        -- references list of string, a list of references made within the text (e.g. @johndoe). Optional, if not provided then an empty list is indexed.
+        -- sentiment string, @see https://en.wikipedia.org/wiki/Sentiment_analysis. Optional, not required to be put into the index.
+        -- source string, the name of the social media platform storing data. Optional, not required to be put into the index.
+        -- subjectivity float, a number -1.0 to 1.0. @see https://en.wikipedia.org/wiki/Sentiment_analysis. Optional, not required to be put into the index. If provided, it must be a float type within the range. If not, it will not be put into the index.
+        -- text string, the body of the message being indexed. Required, without it there is no data. If not provided, then a DEBUG log will be made and nothing done.
+        -- tokens list of string, the text of the message broken down into single words for token matching purposes. Optional, if not provided then an empty list is indexed.
+        '''
+        body = {}
+        # Check each field for None and then do the appropriate actions.
+        if author is not None:
+            body["author"] = author
+        if authorLocation is not None:
+            body["author_location"] = authorLocation
+        if authorScreenName is not None:
+            body["author_screen_name"] = authorScreenName
+        if createdAt is not None:
+            body['created_at'] = createdAt
+        else:
+            log.debug('Provided data to store has None createdAt. Ignoring.')
+            return
+        if hashtags is not None:
+            body["hashtags"] = hashtags
+        if localityConfidence is not None:
+            lC = 0.0
+            try:
+                lC = float(locatlityConfidence)
+            except:
+                # Not a number.
+                log.debug('Provided data has a locality confidence that is not a float. Ignoring.')
+                return
+            if lC < 0.0 or lc > 1.0:
+                log.debug('Provided data has a locality confidence that is not between 0.0 and 1.0 inclusive. Ignoring.')
+                return
+            body["locality_confidence"] = lC
+        if placeName is not None:
+            body['place_name'] = placeName
+        if placeNameFull is not None:
+            body['place_name'] = placeNameFull
+        if polarity is not None:
+            pol = 0.0
+            try:
+                pol = float(polarity)
+                ... m
+            except:
+                # Not a number. Set it to 
+                
+            if lC < -1.0 or lc > 1.0:
+                log.debug('Provided data has a locality confidence that is not between -1.0 and 1.0 inclusive. Ignoring.')
+                return
+
+# -----
+
+            
+        myPlaceFullName = "Not Set"
+        if(placeFullName is not None):
+            myPlaceFullName = placeFullName
+        body["place_full_name"] = myPlaceFullName
+        myPlaceName = "Not Set"
+        if(placeName is not None):
+            myPlaceName = placeName
+        body["place_name"] = myPlaceName
+        body['created_at'] = createdAt
+        body['text'] = text
+        myLocal = "False"
+        if(local is not None):
+            myLocal = local
+        body["local"] = myLocal
+        if(sentiment is not None):
+            body["sentinment"] = sentiment
+        myPolarity = 0.0           
+        if(polarity is not None):
+            myPolarity = polarity
+        body["polarity"] = myPolarity
+        mySubjectivity = 0.0
+        if(subjectivity is not None):
+            mySubjectivity = subjectivity
+        body["subjectivity"] = mySubjectivity
+        body["tokens"] = tokens
+        body["hashtags"] = hashtags
+        body["references"] = references
+        body["source"] = source
+        if(location is not None):
+            body["location"] = location
+
+        try:
+            es.index(index=elastic_index,
+                     doc_type="test-type",
+                     body=body)
+        except Exception as e:
+            print("ERROR: Can not index because "+str(e))
     
 class TwitterHelper:
     '''

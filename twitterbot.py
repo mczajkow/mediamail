@@ -128,6 +128,8 @@ class TwitterBot(StreamListener):
                     # Whitelisted. Ignore it.
                     log.debug('Tweet did not contain whitelisted word: '+str(word)+'. Ignoring.')
                     return
+        
+                
                 
     def on_error(self, status):
         """
