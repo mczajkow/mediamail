@@ -47,7 +47,7 @@ class TwitterBot(StreamListener):
         self.auth = OAuthHandler(self.conf['twitter']['consumer_key'], self.conf['twitter']['consumer_secret'])
         self.auth.set_access_token(self.conf['twitter']['access_token'], self.conf['twitter']['access_token_secret'])
         # Create instance of the tweepy stream using myself as a listener.
-        self.myStream = Stream(auth, listener=self, tweet_mode='extended')
+        self.myStream = Stream(self.auth, listener=self, tweet_mode='extended')
         # Set up the queries based on what is put in the queries section of the configuration. Check to see if it is set.
         if 'queries' not in self.conf:
             log.error('No queries section in configuration. Failing out, don\'t know what to query for on Twitter')
@@ -112,7 +112,7 @@ class TwitterBot(StreamListener):
         if tweetText is None:
             # It would be difficult to process a tweet with no text, so ignore that too.
             log.warn('Incoming data from Twitter had no text in the tweet. Ignoring')
-        log.debug('Incoming tweet, text: '+tweetText)
+        log.debug('Incoming tweet, text: '+str(tweetText))        
         # Reset the self.twitterErrorCounter to zero. We have something that is good.
         self.twitterErrorCounter = 0
     

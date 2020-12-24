@@ -1,6 +1,5 @@
 import logging
 import json
-from builtins import None
 
 log = logging.getLogger(__name__)
 
@@ -82,7 +81,7 @@ class TwitterHelper:
             log.info('Tweet contains no text within it, the jsonDataString given was None.')
             return None
         try:
-            dict_data = json.loads(data)
+            dict_data = json.loads(jsonDataString)
         except Exception as e:
             log.warn('Failed to load the tweet JSON: '+str(e))
             return None
