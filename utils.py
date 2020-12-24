@@ -56,7 +56,23 @@ class ElasticSearchHelper:
     ElasticSearchHelper provides functions to access and store data to Elastic Search for any bot to use.
     @author: Michael
     '''
-    
+    def __init__(self, elasticSearchHost, elasticSearchPort, elasticSearchIndex):
+        '''
+        '''
+        if elasicSearchHost is None:
+            log.warn('Could not initialize Elastic Search with a None host name given.')
+            return
+        if elasticSearchPort is None:
+            log.warn('Could not initialize Elastic Search with a None port given.')
+            return
+        if elasticSearchIndex is None:
+            log.warn('Could not initialize Elastic Search because the index supplied is None.')
+        try:
+            self.elasticSearch = Elasticsearch(['http://'+elastic_host+':'+elastic_port])
+        except Exception as e:
+            log.error('Failed to initialize connection to Elastic Search: '+str(e))
+        self.elasticSearchIndex = elasticSearchIndex
+        
     def storeData(self, author=None, authorLocation=None, authorScreenName='Unknown', createdAt=None, hashtags=[], localityConfidence=0.0, location='', placeName=None, placeFullName=None, polarity=None, references=[], source=None, sentiment=None, subjectivity=None, text=None, tokens=[])
         '''
         Stores data given into ElasticSearch.
@@ -71,7 +87,7 @@ class ElasticSearchHelper:
         -- placeNameFull string, the full unabbreviated place name the author of the message is. Optional not required to be put into the index.
         -- polatity float, a number -1.0 to 1.0. @see https://en.wikipedia.org/wiki/Sentiment_analysis. Optional, not required to be put in the index. If provided, it must be a float type and within the range. If not, it will not be put into the index.
         -- references list of string, a list of references made within the text (e.g. @johndoe). Optional, if not provided then an empty list is indexed.
-        -- sentiment string, @see https://en.wikipedia.org/wiki/Sentiment_analysis. Optional, not required to be put into the index.
+        -- sentiment string, @see https://en.wikipedia.org/wiki/Sentiment_analysis. Should be one of ['negative','neutral','positive']. Optional, not required to be put into the index.
         -- source string, the name of the social media platform storing data. Optional, not required to be put into the index.
         -- subjectivity float, a number -1.0 to 1.0. @see https://en.wikipedia.org/wiki/Sentiment_analysis. Optional, not required to be put into the index. If provided, it must be a float type within the range. If not, it will not be put into the index.
         -- text string, the body of the message being indexed. Required, without it there is no data. If not provided, then a DEBUG log will be made and nothing done.
@@ -80,18 +96,18 @@ class ElasticSearchHelper:
         body = {}
         # Check each field for None and then do the appropriate actions.
         if author is not None:
-            body["author"] = author
+            body['author'] = author
         if authorLocation is not None:
-            body["author_location"] = authorLocation
+            body['author_location'] = authorLocation
         if authorScreenName is not None:
-            body["author_screen_name"] = authorScreenName
+            body['author_screen_name'] = authorScreenName
         if createdAt is not None:
             body['created_at'] = createdAt
         else:
             log.debug('Provided data to store has None createdAt. Ignoring.')
             return
-        if hashtags is not None:
-            body["hashtags"] = hashtags
+        if hashtags is not None and isinstance(hashtags, list)
+            body['hashtags'] = hashtags
         if localityConfidence is not None:
             lC = 0.0
             try:
@@ -103,7 +119,7 @@ class ElasticSearchHelper:
             if lC < 0.0 or lc > 1.0:
                 log.debug('Provided data has a locality confidence that is not between 0.0 and 1.0 inclusive. Ignoring.')
                 return
-            body["locality_confidence"] = lC
+            body['locality_confidence'] = lC
         if placeName is not None:
             body['place_name'] = placeName
         if placeNameFull is not None:
@@ -112,54 +128,43 @@ class ElasticSearchHelper:
             pol = 0.0
             try:
                 pol = float(polarity)
-                ... m
+                if pol >= -1.0 or pol <= 1.0:
+                    body['polarity'] = pol
+                # If not in the range, don't set polarity
             except:
-                # Not a number. Set it to 
-                
-            if lC < -1.0 or lc > 1.0:
-                log.debug('Provided data has a locality confidence that is not between -1.0 and 1.0 inclusive. Ignoring.')
-                return
-
-# -----
-
-            
-        myPlaceFullName = "Not Set"
-        if(placeFullName is not None):
-            myPlaceFullName = placeFullName
-        body["place_full_name"] = myPlaceFullName
-        myPlaceName = "Not Set"
-        if(placeName is not None):
-            myPlaceName = placeName
-        body["place_name"] = myPlaceName
-        body['created_at'] = createdAt
-        body['text'] = text
-        myLocal = "False"
-        if(local is not None):
-            myLocal = local
-        body["local"] = myLocal
-        if(sentiment is not None):
-            body["sentinment"] = sentiment
-        myPolarity = 0.0           
-        if(polarity is not None):
-            myPolarity = polarity
-        body["polarity"] = myPolarity
-        mySubjectivity = 0.0
-        if(subjectivity is not None):
-            mySubjectivity = subjectivity
-        body["subjectivity"] = mySubjectivity
-        body["tokens"] = tokens
-        body["hashtags"] = hashtags
-        body["references"] = references
-        body["source"] = source
-        if(location is not None):
-            body["location"] = location
-
+                # Not a number. Just don't set polarity
+                pass
+        if references is not None and isinstance(references, list)
+            body['references'] = references
+        if sentiment is not None:
+            if sentiment == 'neutral' or sentiment == 'positive' or sentiment == 'negative':
+                body['sentiment'] = sentiment
+        if source is not None:
+            body['source'] = source
+        if subjectivity is not None:
+            sub = 0.0
+            try:
+                sub = float(subjectivity)
+                if sub >= -1.0 or sub <= 1.0:
+                    body['subjectivity'] = sub
+                # If not in the range, don't set polarity
+            except:
+                # Not a number. Just don't set polarity
+                pass
+        if text is not None:
+            body['text'] = text
+        else:
+            log.debug('Provided data to store has None text. Ignoring.')
+            return
+        if tokens is not None and isinstance(tokens, list):
+            body['tokens'] = tokens
+        log.debug('Inserting into Elastic Search this body: '+str(body))
         try:
-            es.index(index=elastic_index,
+            self.elasticSearch.index(index=self.elasticSearchIndex,
                      doc_type="test-type",
                      body=body)
         except Exception as e:
-            print("ERROR: Can not index because "+str(e))
+            log.error("Could not index in Elastic Search: "+str(e))
     
 class TwitterHelper:
     '''
