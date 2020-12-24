@@ -115,7 +115,20 @@ class TwitterBot(StreamListener):
         log.debug('Incoming tweet, text: '+str(tweetText))        
         # Reset the self.twitterErrorCounter to zero. We have something that is good.
         self.twitterErrorCounter = 0
-    
+        # Check black and white listed words in the text, in that order.
+        if 'filters' in self.conf and 'blacklist_words' in self.conf['filters']:
+            for word in self.conf['filters']['blacklist_words']:
+                if str(word).lower() in str(tweetText).lower():
+                    # Blacklisted. Ignore it.
+                    log.debug('Tweet contained blacklisted word: '+str(word)+'. Ignoring.')
+                    return
+        if 'filters' in self.conf and 'whitelist_words' in self.conf['filters']:
+            for word in self.conf['filters']['whitelist_words']:
+                if str(word).lower() not in str(tweetText).lower():
+                    # Whitelisted. Ignore it.
+                    log.debug('Tweet did not contain whitelisted word: '+str(word)+'. Ignoring.')
+                    return
+                
     def on_error(self, status):
         """
         Processes error messages that come from Twitter via the use of the query.
