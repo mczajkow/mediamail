@@ -1,7 +1,6 @@
 import logging
 import json
-from _tkinter import create
-from builtins import None
+from elasticsearch import Elasticsearch
 
 log = logging.getLogger(__name__)
 
@@ -17,22 +16,22 @@ class ConfigFileHelper:
                 
         -- configFile string, the location of the JSON config file to load. Required, without it nothing is loaded and an empty internal dictionary is set up. An error is logged in that case and the global conf variable will remain empty.
         '''
-        log.debug('Attempting to load configFile: '+configFile+' and any global.json found in that folder.')
+        log.debug('Attempting to load configFile: ' + configFile + ' and any global.json found in that folder.')
         self.conf = {}
         if configFile is None:
             log.error('Failed to load configuration file, None was passed in as a parameter to ConfigFileHelper. An empty configuration dictionary will result.')
             return
         parts = configFile.split('/')
-        globalJsonFile = '/'.join(parts[:len(parts)-1])+'/global.json'
+        globalJsonFile = '/'.join(parts[:len(parts) - 1]) + '/global.json'
         try:
             with open(globalJsonFile) as f:
                 data = json.load(f)
                 for key in data:
                     self.conf[key] = data[key]
-            log.debug('Loaded global.json file found at: '+globalJsonFile)
+            log.debug('Loaded global.json file found at: ' + globalJsonFile)
         except Exception as e:
             # Failed to load global.json. It may not exist, or other problem.
-            log.warn('Failed to load: '+globalJsonFile+'. Proceeding to load configFile on itself. Exception is: '+str(e))
+            log.warning('Failed to load: ' + globalJsonFile + '. Proceeding to load configFile on itself. Exception is: ' + str(e))
         # And now load configFile on top of this.
         try:
             with open(configFile) as f:
@@ -40,8 +39,8 @@ class ConfigFileHelper:
                 for key in data:
                     self.conf[key] = data[key]
         except Exception as e:
-            log.error('Failed to load: '+configFile+". This will result in an empty configuration. Exception is: "+str(e))
-        log.info('Loaded configuration file: '+configFile+' successfully.')
+            log.error('Failed to load: ' + configFile + ". This will result in an empty configuration. Exception is: " + str(e))
+        log.info('Loaded configuration file: ' + configFile + ' successfully.')
         
     def getConf(self):
         '''
@@ -51,29 +50,31 @@ class ConfigFileHelper:
         '''
         return self.conf
 
+
 class ElasticSearchHelper:
     '''
     ElasticSearchHelper provides functions to access and store data to Elastic Search for any bot to use.
     @author: Michael
     '''
+
     def __init__(self, elasticSearchHost, elasticSearchPort, elasticSearchIndex):
         '''
         '''
-        if elasicSearchHost is None:
-            log.warn('Could not initialize Elastic Search with a None host name given.')
+        if elasticSearchHost is None:
+            log.warning('Could not initialize Elastic Search with a None host name given.')
             return
         if elasticSearchPort is None:
-            log.warn('Could not initialize Elastic Search with a None port given.')
+            log.warning('Could not initialize Elastic Search with a None port given.')
             return
         if elasticSearchIndex is None:
-            log.warn('Could not initialize Elastic Search because the index supplied is None.')
+            log.warning('Could not initialize Elastic Search because the index supplied is None.')
         try:
-            self.elasticSearch = Elasticsearch(['http://'+elastic_host+':'+elastic_port])
+            self.elasticSearch = Elasticsearch(['http://' + elasticSearchHost + ':' + str(elasticSearchPort)])
         except Exception as e:
-            log.error('Failed to initialize connection to Elastic Search: '+str(e))
+            log.error('Failed to initialize connection to Elastic Search: ' + str(e))
         self.elasticSearchIndex = elasticSearchIndex
         
-    def storeData(self, author=None, authorLocation=None, authorScreenName='Unknown', createdAt=None, hashtags=[], localityConfidence=0.0, location='', placeName=None, placeFullName=None, polarity=None, references=[], source=None, sentiment=None, subjectivity=None, text=None, tokens=[])
+    def storeData(self, author=None, authorLocation=None, authorScreenName='Unknown', createdAt=None, hashtags=[], location=None, localityConfidence=0.0, placeName=None, placeFullName=None, polarity=None, references=[], source=None, sentiment=None, subjectivity=None, text=None, tokens=[]):
         '''
         Stores data given into ElasticSearch.
         
@@ -82,9 +83,10 @@ class ElasticSearchHelper:
         -- authorScreenName string, the social media handle or screen name. Optional, if not provided then 'Unknown' is used.
         -- createdAt string, the date and time the tweet was made in ISO 8601 format. Required, without it we can't really query it back. If not provided then a DEBUG log will be made and nothing done. ISO 8601 formatting is not enforced by this method. Providing anything else would cause the message to be indexed but never found in a time based query.
         -- hashtags list of string, the hashtags used within the body of the message (e.g. #fun). Optional, if not provided then an empty list is indexed.
+        -- location string, in the format of Lat,Lon where Lat and Lon are floats in degrees. Optional, if not provided then nothing is put in the index.
         -- locatlityConfidence float, a number from 0.0 to 1.0 indicating the confidence on how local to the configured location this author is physically. Required, default is 0.0. If a non-number or out of range number is provided, then a DEBUG log will be made and nothing done.
         -- placeName string, the name of the place the author of the message is. Optional, not required to be put into the index.
-        -- placeNameFull string, the full unabbreviated place name the author of the message is. Optional not required to be put into the index.
+        -- placeFullName string, the full unabbreviated place name the author of the message is. Optional not required to be put into the index.
         -- polatity float, a number -1.0 to 1.0. @see https://en.wikipedia.org/wiki/Sentiment_analysis. Optional, not required to be put in the index. If provided, it must be a float type and within the range. If not, it will not be put into the index.
         -- references list of string, a list of references made within the text (e.g. @johndoe). Optional, if not provided then an empty list is indexed.
         -- sentiment string, @see https://en.wikipedia.org/wiki/Sentiment_analysis. Should be one of ['negative','neutral','positive']. Optional, not required to be put into the index.
@@ -106,8 +108,10 @@ class ElasticSearchHelper:
         else:
             log.debug('Provided data to store has None createdAt. Ignoring.')
             return
-        if hashtags is not None and isinstance(hashtags, list)
+        if hashtags is not None and isinstance(hashtags, list):
             body['hashtags'] = hashtags
+        if location is not None:
+            body['loation'] = location
         if localityConfidence is not None:
             lC = 0.0
             try:
@@ -122,8 +126,8 @@ class ElasticSearchHelper:
             body['locality_confidence'] = lC
         if placeName is not None:
             body['place_name'] = placeName
-        if placeNameFull is not None:
-            body['place_name'] = placeNameFull
+        if placeFullName is not None:
+            body['place_full_name'] = placeFullName
         if polarity is not None:
             pol = 0.0
             try:
@@ -134,7 +138,7 @@ class ElasticSearchHelper:
             except:
                 # Not a number. Just don't set polarity
                 pass
-        if references is not None and isinstance(references, list)
+        if references is not None and isinstance(references, list):
             body['references'] = references
         if sentiment is not None:
             if sentiment == 'neutral' or sentiment == 'positive' or sentiment == 'negative':
@@ -158,19 +162,21 @@ class ElasticSearchHelper:
             return
         if tokens is not None and isinstance(tokens, list):
             body['tokens'] = tokens
-        log.debug('Inserting into Elastic Search this body: '+str(body))
+        log.debug('Inserting into Elastic Search this body: ' + str(body))
         try:
             self.elasticSearch.index(index=self.elasticSearchIndex,
                      doc_type="test-type",
                      body=body)
         except Exception as e:
-            log.error("Could not index in Elastic Search: "+str(e))
+            log.error("Could not index in Elastic Search: " + str(e))
+
     
 class TwitterHelper:
     '''
     This class performs common Twitter functions needed by bots that interact with this social media platform.
     @author: Michael
     '''
+
     def __init__(self, config):
         '''
         Sets up the TwitterHelper using the configuration loaded from a file
@@ -183,34 +189,111 @@ class TwitterHelper:
             return
         self.conf = config
         
-    def getTweetText(self, jsonDataString):
+    def getTweetText(self, tweetData):
         '''
-        Looks at the content of incoming tweet data in a JSON formatted string and pulls out the raw text found within.
+        Looks at the content of incoming tweet data and pulls out the raw text found within.
         
-        -- jsonDataString string, the JSON data from a tweet. Required, if None is passed then None is returned. If it is bad JSON, an error is thrown and None is returned.
-        @return string, the raw full tweet text contained therein. None is returned jsonDataString has bad/unexpected content or there really is no tweet raw text in it.
+        -- tweetData dictionary, of parsed Tweet JSON. Required, if None is passed then None is returned. If it is bad JSON, an error is thrown and None is returned.
+        @return string, the raw full tweet text contained therein. None is returned tweetData has bad/unexpected content or there really is no tweet raw text in it.
         '''
-        if jsonDataString is None:
-            log.info('Tweet contains no text within it, the jsonDataString given was None.')
+        if tweetData is None:
+            log.debug('Tweet contains no text within it, as the tweetData given was None.')
             return None
-        try:
-            dict_data = json.loads(jsonDataString)
-        except Exception as e:
-            log.warn('Failed to load the tweet JSON: '+str(e))
-            return None
-        if "extended_tweet" in dict_data:
+        if "extended_tweet" in tweetData:
             # Special class of Tweets have their data in this location. Check here first.
-           return dict_data['extended_tweet']['full_text']
-        elif 'retweeted_status' in dict_data:
+           return tweetData['extended_tweet']['full_text']
+        elif 'retweeted_status' in tweetData:
             # Retweets have their text data somewhere else.
-            if 'extended_tweet' in dict_data['retweeted_status'] and 'full_text' in dict_data['retweeted_status']['extended_tweet']:
-                return dict_data['retweeted_status']['extended_tweet']['full_text']
+            if 'extended_tweet' in tweetData['retweeted_status'] and 'full_text' in tweetData['retweeted_status']['extended_tweet']:
+                return tweetData['retweeted_status']['extended_tweet']['full_text']
         # Otherwise, try just 'text' at the top level.
         try:
-            return dict_data['text']
+            return tweetData['text']
         except Exception as e:
             # Some kind of error in getting the data.
-            log.warn('Failed to find the text in the tweet because of an error: '+str(e))
+            log.warning('Failed to find the text in the tweet because of an error: ' + str(e))
             return None
         log.info('Tweet contains no text that could be found.')
         return None
+    
+    def localityCheckOfATweet(self, tweetData):
+        """
+        Each tweet has several places where the name of the tweeter's town can be hidden. This function pulls them out and then uses @see localityCheckOfAPlace to see if the person is local.
+                
+        -- tweetData dictionary, the parsed JSON of a Tweet. Required. Without it, nothing can be determined and after a DEBUG log, False is returned.
+        @return boolean, True if the tweet is from a local person, False otherwise.
+        """
+        if tweetData is None:
+            log.debug('Tweet contains no place information in it as the tweetData given was None.')
+            return False
+        town1 = None
+        town2 = None
+        town3 = None
+        log.debug(str(tweetData))
+        if 'place' in tweetData and tweetData['place'] is not None:
+            if 'full_name' in tweetData['place']:
+                town1 = tweetData['place']['full_name']
+            if 'name' in tweetData['place']:
+                town2 = tweetData['place']['name']
+        elif 'user' in tweetData:
+            if 'location' in tweetData['user']:
+                town3 = tweetData['user']['location']
+        if self.localityCheckOfAPlace(town1) or self.localityCheckOfAPlace(town2) or self.localityCheckOfAPlace(town3):
+            return True
+        return False
+                
+    def localityCheckOfAPlace(self, placeFullName):
+        """
+        Each tweet has a locality place name in it. This function will look at the configuration to see if a given place is from someone who lives near. If so, it returns True, False otherwise.
+        
+        -- placeFullName string, a place name of the tweet sender. Required. Without it, nothing can be determined and after a DEBUG log, False is returned.
+        @return boolean, True if the tweet is from a loccal person, False otherwise.
+        """
+        if placeFullName is None:
+            log.debug('The placeFullName given was None. Returning False.')
+            return False
+        # Pull out the various parts of the configuration needed
+        if 'locality' not in self.conf:
+            # No locality set in the configuration. Nothing can ever be True now, so return False.
+            return False
+        local_towns = []
+        state_abbreviation = ""
+        state_full = ""
+        if 'local_towns' in self.conf['locality']:
+            local_towns = self.conf['locality']['local_towns']
+        if 'state_abbreviation' in self.conf['locality']:
+            state_abbreviation = self.conf['locality']['state_abbreviation']
+        if 'state_full' in self.conf['locality']:
+            state_full = self.conf['locality']['state_full']        
+        # Locality Check assumes False first.
+        try:
+            # Could be the name of the town after taking out a comma, e.g. "Berlin, NJ"
+            town = placeFullName.split(",")
+            if town[0] in local_towns and state_abbreviation in town[1]:
+                return True
+        except Exception as e:
+            # Some problem. OK keep going.
+            pass
+        try:
+            # Relax the constraint a little and ignore case.
+            town = placeFullName.split(",")
+            if state_full.lower() in town[1].lower() or state_abbreviation.lower() in town[1].lower():
+                # This is in the local state. Check town.
+                for interestedTown in local_towns:
+                    if town[0].lower() in interestedTown.lower():
+                        return True
+        except Exception as e:
+            # Some problem. OK keep going.
+            pass
+        # Maybe the name has no comma in it? That's OK too.
+        try:
+            if state_abbreviation.lower() in placeFullName.lower() or state_full.lower() in placeFullName.lower():
+                # This is in the local state. Check town.
+                for interestedTown in local_towns:
+                    if interestedTown.lower() in placeFullName.lower():
+                        return True
+        except Exception as e:
+            # Some problem. OK keep going.
+            pass
+        # No more places it could be...                           
+        return False
