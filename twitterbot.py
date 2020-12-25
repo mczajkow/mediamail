@@ -203,7 +203,7 @@ class TwitterBot(StreamListener):
         # Locality Confidence
         locality = self.twitterHelper.localityCheckOfATweet(tweetData)
         # Confidence is 0.0 (false) or 1.0, for now
-        # TODO: Revisit other values later, such as if the tweet originates near the configured location, perhaps that is local?
+        # TODO #2-Build-maybe-Local-Feature: Revisit other values later, such as if the tweet originates near the configured location, perhaps that is local?
         localityConfidence = 0.0
         if locality is True:
             localityConfidence = 1.0

@@ -1,26 +1,29 @@
-# mediamail design
+# Mediamail Design
 
 ## Overview
-Media mail works as a trio of bots representing an interaction with a social media platform.
-
-### Platform Bot
-Platform Bots reach out to a specific social media application, e.g. Twitter and funnel data into a common Elastic Search index
-
-#### Twitter Bot
-Twitter Bot is a specific Platform Bot
-
-### Mail Bot
-Mail Bots query the common Elastic Search index on behalf of a user, given user preferences
-
-### Reply Bot
-Reply Bots manage replies from a user, given user preferences, and then interact back with the social media Platform accordingly
+Media mail works as a trio of bots representing an interaction with a social media platform
+* Platform Bot: These reach out to a specific social media application, e.g. Twitter and funnel data into a common Elastic Search index
+* Mail Bot: These query the common Elastic Search index on behalf of a user, given user preferences
+* Reply Bot: These manage replies from a user, given user preferences, and then interact back with the social media Platform accordingly
 
 ## Configuration
-All configuration of bots is found in the `run` folder which are then executed at run time. The `conf` folder is reserved for example templates meant to be copied and filled in and placed in `run`
+All configuration of bots is found in the `run` folder which are then executed at run time. The `conf` folder is reserved for example templates meant to be copied and filled in and placed in `run`. An example might be copying `twitterbot.json` into `run\twitterbot_mytracks.json` to fill in a specific Twitter bot configuration.
 
-See the README.md in the `conf` folder for information on how to configure each bot. In this section, we cover a high-level description of the design behind the configuration of the bots.
+### Configuring Global Properties
+The `global.json` file is where properties for all bot types can be found:
+
+`elastic`: This contains the host, port and index name to use.
 
 ### Configuring Twitter Bot
+The `twitterbot.json
 
-* `queries`: This is where you set what kind of streaming query to Twitter you'd like to set up.
-	* `aois`: This is a list of floats that defines geographical boxes in latitude and longitudes where each box is a quadruplet: `sw_lon`, `sw_lat`, `nw_lon`, `nw_lat`. The list can be any length of quadruplets and the length of the list modulo four should be zero.
+`filters`: These are lists of `string` that set up various filters. `blacklist_words` will exclude any Tweet from going into Elastic Search that contains any of these words. Useful for pornographic or other offensive material filtering. `whitelist_words` will only accept Tweets to put into Elastic Search if they contain the word. `blacklist_words` is checked first ahead of `whitelist`. `common_words` is used in tokenizing a Tweet so that these words are not considered tokens for searching upon, e.g. there would be zillions of hits on the word "the"
+
+`locality`: These help Twitter Bot figure out of a tweet is from an author near to you. The `local_towns` list of `string` should be filled in with local town names, e.g. `Berlin` or `Voorhees` without specifying the state. `state` and `state_abbreivation` are the United State states and its postal abbreviation, e.g. `New Jersey` and `NJ`
+
+`queries`: This is where you set what kind of streaming query to Twitter you'd like to set up. 
+* `aois`: This is a list of `float` that defines geographical boxes in latitude and longitudes where each box is a quadruplet: `sw_lon`, `sw_lat`, `nw_lon`, `nw_lat`. The list can be any length of quadruplets and the length of the list modulo four should be zero.
+* `followers`: This is a list of `integer` that represent Twitter user IDs. When setting this up the Twitter Bot will track for updates from these users. Helpful for things like your followers list or people you might follow.
+* `tracks`: This is a list of `string` representing key words you want to set up a query for. For example, `pray` would start scanning Twitter for all tweets that contain that word.
+
+`twitter`: This is access information needed to set up a Twitter connection and it also contains the user handle name used. To understand this more, please see: https://developer.twitter.com/en
