@@ -86,12 +86,8 @@ class TwitterBot(StreamListener):
             elif len(locations) == 0:
                 log.error('The configured aois to query for Twitter are not valid. The list should contain quadruplets of floating values. Instead, it has nothing in it. See DESIGN.md for more information. No query to Twitter is made.')
                 return
-            # Each of these has to be made into a string for Twitter to process it via Tweepy.
-            stringLocations = []
-            for floatLocation in locations:
-                stringLoations += str(floatLoation)
-            log.debug('Calling filter on Twitter with locations: ' + str(stringLocations))
-            self.myStream.filter(locations=stringLocations, is_async=True)
+            log.debug('Calling filter on Twitter with locations: ' + str(locations))
+            self.myStream.filter(locations=locations, is_async=True)
             log.info('Filter set! Twitter is now scanning these aois.')
         elif 'followers' in self.conf['queries']:
             log.info('Setting up a follower query to Twitter')
