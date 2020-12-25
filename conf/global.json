@@ -1,11 +1,8 @@
 {
-	'elastic' : {
-		'host' : '',
-		'index' : '',
-		'port' : 2900
-	}
-	'logging' : {
-		'level' : ''
+	"elastic" : {
+		"host" : "",
+		"index" : "",
+		"port" : 2900
 	}
 }
 	
