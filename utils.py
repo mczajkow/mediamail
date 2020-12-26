@@ -73,6 +73,21 @@ class ElasticSearchHelper:
         except Exception as e:
             log.error('Failed to initialize connection to Elastic Search: ' + str(e))
         self.elasticSearchIndex = elasticSearchIndex
+    
+    def query(self, queryDict):
+        '''
+        Queries Elastic Search with a single query and returns the results of the query.
+        
+        -- queryDict dictionary. Elastic Search uses dictionaries with "query" in them to return results. Required. Without this being set, a WARNING log is issued and nothing happens.
+        @return dictionary containing a list of results all in JSON string format.
+        '''
+        if queryDict is None:
+            log.warning('Could not query Elastic Search with None query dictionary.')
+            return
+        try:
+            return self.elasticSearch.search(index=self.elasticSearchIndex, body=queryDict)
+        except Exception as e:
+            log.error('Failed query to Elastic Search for this query: '+str(queryDict) + " Error is: "+str(e))
         
     def storeData(self, author=None, authorLocation=None, authorScreenName='Unknown', createdAt=None, hashtags=[], location=None, localityConfidence=0.0, placeName=None, placeFullName=None, polarity=None, references=[], source=None, sentiment=None, subjectivity=None, text=None, tokens=[]):
         '''

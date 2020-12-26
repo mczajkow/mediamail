@@ -1,7 +1,12 @@
 {
-	"scoring" : {
-		"disinterested_words" : [],
-		"interested_words" : [],
-		"minimum_score" : 0
+	"queries": [
+		{
+			"query": {}
+		}
+	],
+	"scoring": {
+		"disinterested_words": [],
+		"interested_words": [],
+		"minimum_score": 0
 	}
 }
