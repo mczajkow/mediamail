@@ -44,6 +44,9 @@ class MailBot:
         log.debug('Setting up Elastic Search...')
         self.elasticSearchHelper = ElasticSearchHelper(self.conf['elastic']['host'], self.conf['elastic']['port'], self.conf['elastic']['index'])
         log.info('Elastic Search setup complete.')
+        # Finally, define the Mailbot's global result dictionary of replies:
+        self.globalReply = {}
+        
 
     def executeQueries(self):
         '''
@@ -55,13 +58,23 @@ class MailBot:
             return
         for query in self.conf['queries']:
             # Execute this query in Elastic Search and print the resuts out for now
-            log.debug('Query to Elastic Search is: ' + str(query))
-            result = self.elasticSearchHelper.query(query)
+            # Pull out the "query" part and stick that in its own dictionary. The rest of it is metadata needed later, e.g. 'title'
+            queryDict = { "query" : query["query"] }            
+            log.debug('Query to Elastic Search is: ' + str(queryDict))
+            result = self.elasticSearchHelper.query(queryDict)
             log.debug('Result: ' + str(result))
             # TODO -- seems to be only bringing in small quantities. Paging?
-        # TODO -- now parse the results and built up scores for each of the hits.
-        
+            # Parse the query by sending each item to 
+            # parseResult(result)
+        # TODO -- now parse the results and built up scores for each of the hits.        
         # TODO -- then send out the mail
+
+    def parseResult(self, result):
+        '''
+        Parses a response from Elastic Search which is a dictionary containing multiple messages. Scores each one and puts it in the globalReply.
+        '''
+        pass
+        
 
 def get_args():
     '''

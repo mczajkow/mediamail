@@ -364,7 +364,6 @@ class ScoringHelper:
             if word.lower() in tweet_text.lower():
                 priorityValue -= 25
         # TODO #9-Implement Derivative Message Scoring: Re-work the index to store a flag for derived messages like re-tweets and then score them separately.
-
         # HASHTAG and SHOUTOUT HECK
         hashtags = len(tweet_text.split("#"))
         priorityValue = priorityValue - (25 * hashtags)        
