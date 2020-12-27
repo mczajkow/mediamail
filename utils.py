@@ -4,6 +4,7 @@ from elasticsearch import Elasticsearch
 
 log = logging.getLogger(__name__)
 
+
 class ConfigFileHelper:
     '''
     ConfigFileHelper loads JSON configuration files and then holds on to a reference to them in memory as a dictionary of terms.
@@ -87,7 +88,7 @@ class ElasticSearchHelper:
         try:
             return self.elasticSearch.search(index=self.elasticSearchIndex, body=queryDict)
         except Exception as e:
-            log.error('Failed query to Elastic Search for this query: '+str(queryDict) + " Error is: "+str(e))
+            log.error('Failed query to Elastic Search for this query: ' + str(queryDict) + " Error is: " + str(e))
         
     def storeData(self, author=None, authorLocation=None, authorScreenName='Unknown', createdAt=None, hashtags=[], location=None, localityConfidence=0.0, placeName=None, placeFullName=None, polarity=None, references=[], source=None, sentiment=None, subjectivity=None, text=None, tokens=[]):
         '''
@@ -185,7 +186,7 @@ class ElasticSearchHelper:
         except Exception as e:
             log.error("Could not index in Elastic Search: " + str(e))
 
-    
+
 class TwitterHelper:
     '''
     This class performs common Twitter functions needed by bots that interact with this social media platform.
@@ -312,3 +313,74 @@ class TwitterHelper:
             pass
         # No more places it could be...                           
         return False
+
+
+class ScoringHelper:
+    '''
+    This class is used to help score data found in Elastic Search according to user preferences found in the configuration.    
+    @author: Michael
+    '''
+    
+    def __init__(self, config):
+        '''
+        Sets up the ScoringHelper using the configuration loaded from a file
+        
+        -- config dictionary, the loaded properties from the configuration files for the bot. Required, if None then an error is logged and nothing happens.
+        @see ConfigFileHelper
+        '''
+        if config is None:
+            log.error('Failed to initialize ScoringHelper as provided config dictionary is None. ScoringHelper is not set up properly.')
+            return
+        self.conf = config
+        
+    def assignPriority(self, tweet_text, tweet_data, specialFlags):
+        """
+        See DESIGN.md. A tweet should be given a priority so that when put in a 
+        queue to be sent to the IRC chat room, it can be elevated if it is more important.
+        Returns an integer value minimum 1.
+
+        --- tweet_text the text of the tweet
+        --- tweet_data the dictionary of a tweet that is parsed. This containts 
+            tweet_text but the text data is in one of many places. Ergo, to make this 
+            simpler, we request both. This parameter is used by other functions to look 
+            up other data in the tweet to assign priority.
+        --- specialFlags are considered for additional scoring rules.
+        """
+        priorityValue = 1
+        # LENGTH
+        if len(tweet_text) > 1:
+            priorityValue = len(tweet_text)            
+        # LOCALITY
+        if self.localityCheckOfATweet(tweet_data):
+            priorityValue += 250
+        # FOLLOWER
+        if self.followerCheckOfATweet(tweet_data):
+            # This is from a follower
+            priorityValue += 50
+        # KEYWORDS of INTEREST
+        for ircBot in twitter_interested_words:
+            for word in twitter_interested_words[ircBot]:
+                if word.lower() in tweet_text.lower():
+                    priorityValue += 25
+        # KEYWORDS of DISINTEREST
+        for word in twitter_disinterested_words:
+            if word.lower() in tweet_text.lower():
+                priorityValue -= 25
+        # TWEET or RE-TWEET?
+        if 'retweeted_status' not in tweet_data:
+            # This is an original tweet.
+            priorityValue += 100     
+        else:
+            priorityValue -= 50   
+        # HASHTAG and SHOUTOUT HECK
+        hashtags = len(tweet_text.split("#"))
+        priorityValue = priorityValue - (25 * hashtags)        
+        shoutouts = len(tweet_text.split("@"))
+        priorityValue = priorityValue - (50 * shoutouts)
+        # SHOUT OUTS TO ME
+        if "@" + my_twitter_handle in tweet_text.lower():
+            priorityValue += 500
+        # SPECIAL FLAGS
+        if 'maybeLocal' in specialFlags:
+            priorityValue += 75
+        return priorityValue

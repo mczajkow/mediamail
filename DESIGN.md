@@ -27,3 +27,12 @@ The `twitterbot.json
 * `tracks`: This is a list of `string` representing key words you want to set up a query for. For example, `pray` would start scanning Twitter for all tweets that contain that word.
 
 `twitter`: This is access information needed to set up a Twitter connection and it also contains the user handle name used. To understand this more, please see: https://developer.twitter.com/en
+
+## Scoring
+Each message sent to the user via an email has an `integer` score associated with it. This is determined by several factors which are configured in Mailbot's mailbot.json (see above). 
+
+Scoring is determined as follows:
+* Locality: Messages that come from an author near a configured location are considered local to that location. Locality confidence is determined by matching the author's provided location information to that of the configuration. Locality confidence is a value 0.0 to 1.0 where 0.0 is certainly not local and 1.0 is certainly local. The product of `locality_multiplier` with the locality confidence awards a certain number of points for each message. Recommended value is `250`. A few examples with the recommended value would be: a locality confidence of 1.0 would award 250 points, a confidence of 0.5 would award 125 points, and a confidence of 0.1 would award 25 points.    
+* Number of points per word in the message: Short messages are less intereting. It was once said the average length of a tweet is 6 characters. The number of points per word is configured in the `points_per_word` setting. Recommended value is `1`.
+
+

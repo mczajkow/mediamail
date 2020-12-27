@@ -6,7 +6,12 @@
 	],
 	"scoring": {
 		"disinterested_words": [],
+
 		"interested_words": [],
-		"minimum_score": 0
+		"locality_multiplier" : 0,
+		"minimum_score": 0,
+		
+		"points_per_word" : 0
+		
 	}
 }

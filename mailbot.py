@@ -60,6 +60,7 @@ class MailBot:
             log.debug('Result: ' + str(result))
             # TODO -- seems to be only bringing in small quantities. Paging?
         # TODO -- now parse the results and built up scores for each of the hits.
+        
         # TODO -- then send out the mail
 
 def get_args():
