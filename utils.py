@@ -353,10 +353,7 @@ class ScoringHelper:
         # LOCALITY
         if self.localityCheckOfATweet(tweet_data):
             priorityValue += 250
-        # FOLLOWER
-        if self.followerCheckOfATweet(tweet_data):
-            # This is from a follower
-            priorityValue += 50
+        # TODO #7-Redesign-Follower-Scoring: Twitterchat had this capability but Mediamail has to implement this differently. It would need to be the follower of the user who gets the e-mail.
         # KEYWORDS of INTEREST
         for ircBot in twitter_interested_words:
             for word in twitter_interested_words[ircBot]:
@@ -366,12 +363,8 @@ class ScoringHelper:
         for word in twitter_disinterested_words:
             if word.lower() in tweet_text.lower():
                 priorityValue -= 25
-        # TWEET or RE-TWEET?
-        if 'retweeted_status' not in tweet_data:
-            # This is an original tweet.
-            priorityValue += 100     
-        else:
-            priorityValue -= 50   
+        # TODO #9-Implement Derivative Message Scoring: Re-work the index to store a flag for derived messages like re-tweets and then score them separately.
+
         # HASHTAG and SHOUTOUT HECK
         hashtags = len(tweet_text.split("#"))
         priorityValue = priorityValue - (25 * hashtags)        

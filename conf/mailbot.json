@@ -6,11 +6,12 @@
 	],
 	"scoring": {
 		"disinterested_words": [],
-
-		"interested_words": [],
+		"hashtag_heck" : 0,
+		"interested_words": {},
+		
 		"locality_multiplier" : 0,
 		"minimum_score": 0,
-		
+		"shoutout_heck" : 0,
 		"points_per_word" : 0
 		
 	}
