@@ -333,19 +333,18 @@ class ScoringHelper:
             return
         self.conf = config
         
-    def assignPriority(self, tweet_text, tweet_data, specialFlags):
-        """
-        See DESIGN.md. A tweet should be given a priority so that when put in a 
-        queue to be sent to the IRC chat room, it can be elevated if it is more important.
-        Returns an integer value minimum 1.
-
-        --- tweet_text the text of the tweet
-        --- tweet_data the dictionary of a tweet that is parsed. This containts 
-            tweet_text but the text data is in one of many places. Ergo, to make this 
-            simpler, we request both. This parameter is used by other functions to look 
-            up other data in the tweet to assign priority.
-        --- specialFlags are considered for additional scoring rules.
-        """
+    def scoreContent(self, queryData):
+        '''
+        Takes data stored in Elastic Search and then assigns priority to it based on the content and what is in the configuration. 
+        
+        -- queryData, dictionary. This is the result of querying Elastic Search. It is what is stored in ElasticSearchHelper. Required, can't score without it. If None is supplied, a warning is issued and zero is returned.
+        @return integer, the score for that query data based on configuration. Scores can be any number including negatives.
+        @see DESIGN.md
+        @see ElasticSearchHelper
+        '''
+        if queryData is None:
+            log.warning('Could not score data as None was passed in.')
+            return 0        
         priorityValue = 1
         # LENGTH
         if len(tweet_text) > 1:

@@ -1,7 +1,7 @@
 import argparse
 import jaraco.logging
 import logging
-from utils import ConfigFileHelper, ElasticSearchHelper
+from utils import ConfigFileHelper, ElasticSearchHelper, ScoringHelper
 from builtins import None
 
 log = logging.getLogger(__name__)
@@ -45,9 +45,10 @@ class MailBot:
         log.debug('Setting up Elastic Search...')
         self.elasticSearchHelper = ElasticSearchHelper(self.conf['elastic']['host'], self.conf['elastic']['port'], self.conf['elastic']['index'])
         log.info('Elastic Search setup complete.')
+        # Set up the Scoring Helper.
+        self.scoringHelper = ScoringHelper(self.conf)
         # Finally, define the Mailbot's global result dictionary of replies:
         self.globalReply = {}
-        
 
     def executeQueries(self):
         '''
@@ -104,7 +105,10 @@ class MailBot:
             # First time set up. Copy in the original query contents because later we'll need the metadata when sending out the mail.
             globalReply[query['title']] : {}
             globalReply[query['title']]['originalQuery'] : query
-        # Now score the results found in the result list..
+        # Now score the results found in the result list.
+        score = self.scoringHelper.scoreContent(result)
+        # Now put that in the globalReply appropriately.
+        # -------------- DESIGN THIS NEXT ----------------------
         
     def sendMail(self):
         '''
