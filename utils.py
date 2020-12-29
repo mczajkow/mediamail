@@ -1,6 +1,7 @@
 import logging
 import json
 from elasticsearch import Elasticsearch
+from importlib.metadata import EntryPoint
 
 log = logging.getLogger(__name__)
 
@@ -60,6 +61,9 @@ class ElasticSearchHelper:
 
     def __init__(self, elasticSearchHost, elasticSearchPort, elasticSearchIndex):
         '''
+        Initializes the ElasticSearchhelper
+        
+        # TODO        
         '''
         if elasticSearchHost is None:
             log.warning('Could not initialize Elastic Search with a None host name given.')
@@ -186,6 +190,43 @@ class ElasticSearchHelper:
         except Exception as e:
             log.error("Could not index in Elastic Search: " + str(e))
 
+    def stripResults(self, response):
+        '''
+        Elastic Search puts a lot of extra wrapping around replies that isn't useful to processing results directly.
+
+        The content of the response passed in should be structured as follows (not everything shown):
+        { "hits" :
+         { "hits" :
+           [ 
+            {},{},{} ...
+          ]
+         }
+        }
+        This method will return just the inner array.
+        
+        -- response dictionary, is the retuned response from Elastic Search that contains the content being stripped. Required, if none or not formatted as described in the description then an empty list is returned and a warning issued.
+        '''
+        if response is None:
+            log.warning('None was passed into stripResults. Empty list being returned.')
+            return []
+        if isinstance(response, dictionary) is False:
+            log.warning('A non dictionary was passed into stripResults. Empty list being returned.')
+            return []
+        if 'hits' not in response:
+            log.warning('Hits not found in the dictionary passed in. Empty list being returned.')
+            return []
+        hits1 = response['hits']
+        if isinstance(hits1, dictionary) is False:
+            log.warning('A non dictionary was found under hits of the response passed in. Empty list being returned.')
+            return []
+        if 'hits' not in hits1:
+            log.warning('Hits[Hits] not found in the dictionary passed in. Empty list being returned.')
+            return []
+        strippedList = hits1['hits']
+        if isinstance(strippedList, list) is False:
+            log.warning('Hits[Hits] found in the dictionary passed in, but it isn\'t a list. Empty list being returned.')
+            return []
+        return strippedList
 
 class TwitterHelper:
     '''
@@ -333,22 +374,39 @@ class ScoringHelper:
             return
         self.conf = config
         
-    def scoreContent(self, queryData):
+    def scoreContent(self, contentHit):
         '''
-        Takes data stored in Elastic Search and then assigns priority to it based on the content and what is in the configuration. 
+        Takes data stored in Elastic Search and then assigns priority to it based on the content and what is in the configuration.
         
-        -- queryData, dictionary. This is the result of querying Elastic Search. It is what is stored in ElasticSearchHelper. Required, can't score without it. If None is supplied, a warning is issued and zero is returned.
         @return integer, the score for that query data based on configuration. Scores can be any number including negatives.
         @see DESIGN.md
         @see ElasticSearchHelper
         '''
         if queryData is None:
             log.warning('Could not score data as None was passed in.')
-            return 0        
-        priorityValue = 1
+            return 0
+        # Similarly we need the section 'scoring' to be there too
+        if 'scoring' not in self.conf:
+            log.warning('There is no scoring section in the configuration. Returning 0.')
+            return 0
+        score = 0 # start off at zero
+        
+        # TODO --- Handle this after doing the stripping of content
+        
+        
         # LENGTH
-        if len(tweet_text) > 1:
-            priorityValue = len(tweet_text)            
+        if 'points_per_word' in self.conf['scoring']:
+            ppw = 0
+            try:
+                ppw = int(self.conf['scoring']['points_per_word'])
+            except Exception as e:
+                # Not an integer?
+                log.debug('Could not utilize points_per_word in the scoring section of the configuration: '+str(e))
+            
+            
+                
+            if len(queryData...) > 0:
+                score += len(tweet_text) * ppwd                
         # LOCALITY
         if self.localityCheckOfATweet(tweet_data):
             priorityValue += 250

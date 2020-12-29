@@ -58,7 +58,11 @@ class MailBot:
         '''
         # Check to see if queries is set in the configuration, first.
         if 'queries' not in self.conf:
-            log.warn('No queries were put in the configuration file. Nothing happens.')
+            log.warning('No queries were put in the configuration file. Nothing happens.')
+            return
+        # Make sure it is also a list.
+        if isinstance(self.conf['queries'], list) is False:
+            log.warning('Configured queries is not a list. Change the configuration and try again.')
             return
         for query in self.conf['queries']:
             # Execute this query in Elastic Search and print the resuts out for now.
@@ -73,11 +77,16 @@ class MailBot:
                 continue
             # Pull out the "query" part and stick that in its own dictionary. The rest of it is metadata needed later, e.g. 'title'
             # Elastic search will not want any of that, it just wants a dictionary with one term: "query"
-            queryDict = { "query" : query["query"] }            
+            queryDict = { "query" : query["query"] }
             log.debug('Query to Elastic Search is: ' + str(queryDict))
             result = self.elasticSearchHelper.query(queryDict)
             log.debug('Result: ' + str(result))
             # TODO -- seems to be only bringing in small quantities. Paging?
+            # Stip the results that come back using the helper function in ElasticSearchHelper. Turns results into an array.
+            resultArray = self.elasticSearchHelper.stripResults(result)
+            
+            
+            
             self.parseResult(result, title, hitLimit)
         # TODO -- now parse the results and built up scores for each of the hits.
         # TODO -- then send out the mail
@@ -105,8 +114,11 @@ class MailBot:
             # First time set up. Copy in the original query contents because later we'll need the metadata when sending out the mail.
             globalReply[query['title']] : {}
             globalReply[query['title']]['originalQuery'] : query
+        # TODO -- Next, strip out the replies given by Elastic Search found in result.
+        # The content has to be parsed, see Utils' ElasticSearchHelper stripResults method...
+        
         # Now score the results found in the result list.
-        score = self.scoringHelper.scoreContent(result)
+        # score = self.scoringHelper.scoreContent(result)
         # Now put that in the globalReply appropriately.
         # -------------- DESIGN THIS NEXT ----------------------
         
