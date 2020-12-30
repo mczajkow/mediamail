@@ -200,13 +200,20 @@ class ElasticSearchHelper:
         { "hits" :
          { "hits" :
            [ 
-            {},{},{} ...
+            {
+             "_source" : {}
+            },
+            {
+             "_source" : {}
+            },
+            ...
           ]
          }
         }
-        This method will return just the inner array.
+        This method will return just the _source dictionarys in an array.
         
         -- response dictionary, is the retuned response from Elastic Search that contains the content being stripped. Required, if none or not formatted as described in the description then an empty list is returned and a warning issued.
+        @return list, see description. It contains only the _source contents of the Elastic Search result.
         '''
         if response is None:
             log.warning('None was passed into stripResults. Empty list being returned.')
@@ -228,7 +235,14 @@ class ElasticSearchHelper:
         if isinstance(strippedList, list) is False:
             log.warning('Hits[Hits] found in the dictionary passed in, but it isn\'t a list. Empty list being returned.')
             return []
-        return strippedList
+        # Now go through strippedList and then pull out each item and its "_source" content.
+        returnedList = []
+        for item in strippedList:
+            if isinstance(item, dict) is False:
+                continue # This one is not a dictionary, and should be.
+            if '_source' in item and isinstance(item['_source'], dict):
+                returnedList += [item['_source']]
+        return returnedList
 
 class TwitterHelper:
     '''
@@ -460,14 +474,39 @@ class ScoringHelper:
         # TODO: Having a distinction between these two (interest and disinterest) makes no sense. Rather just a global keyword scoring allowing any positive or negative number makes better sense.
         # TODO #9-Implement Derivative Message Scoring: Re-work the index to store a flag for derived messages like re-tweets and then score them separately.
         # HASHTAG and SHOUTOUT HECK
-        hashtags = len(tweet_text.split("#"))
-        priorityValue = priorityValue - (25 * hashtags)        
-        shoutouts = len(tweet_text.split("@"))
-        priorityValue = priorityValue - (50 * shoutouts)
+        if 'hashtags' in record and isinstance(record['hashtags'], list) and len(record['hashtags']) > 0:
+            # By getting here, there is a list of hashtags in the record that should be scored.
+            hh = 0
+            if 'hashtag_heck' in self.conf['scoring']:
+                try:
+                    hh = int(self.conf['scoring']['hashtag_heck'])
+                except Exception as e:
+                    log.error('Hashtag heck value in the configuration is not an integer. Won\'t score on any hashtag')
+                score += (len(record['hashtags']) * hh)
+        if 'references' in record and isinstance(record['references'], list) and len(record['references']) > 0:
+            # By getting here, there is a list of references in the record that should be scored.
+            sh = 0
+            if 'shoutout_heck' in self.conf['scoring']:
+                try:
+                    sh = int(self.conf['scoring']['shoutout_heck'])
+                except Exception as e:
+                    log.error('Shoutout heck value in the configuration is not an integer. Won\'t score on any shoutout')
+                score += (len(record['references']) * sh)
         # SHOUT OUTS TO ME
-        if "@" + my_twitter_handle in tweet_text.lower():
-            priorityValue += 500
-        # SPECIAL FLAGS
-        if 'maybeLocal' in specialFlags:
-            priorityValue += 75
-        return priorityValue
+        if 'user_identification' in self.conf and isinstance(self.conf['user_identification'], dict) and 'social_media_handles' in self.conf['user_identification'] and isinstance(self.conf['user_identification']['social_media_handles'], list) and len(self.conf['user_identification']['social_media_handles']) > 0:
+            # By getting here, there are social media handles associated with the user worth checking. 
+            # If they exist in the references of the record, then additional scoring could happen.
+            rtm = 0
+            if 'references_to_me' in self.conf['scoring']:
+                try:
+                    rtm = int(self.conf['scoring']['references_to_me'])
+                except Exception as e:
+                    log.error('References to me value in the configuration is not an integer. Won\'t score on any reference to me.')
+            if 'references' in record and isinstance(record['references'], list) and len(record['references']) > 0:
+                for handle in self.conf['user_identification']['social_media_handles']:
+                    for reference in record['references']:
+                        if handle.lower() in reference.lower():
+                            # Match. The references contain @ whereas the handles do not have to.
+                            score += rtm
+        log.debug('Assigning score value of: '+str(score)+' to the record')
+        return score

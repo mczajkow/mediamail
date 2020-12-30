@@ -14,6 +14,8 @@ The `global.json` file is where properties for all bot types can be found:
 
 `elastic`: This contains the host, port and index name to use.
 
+`user_identification`: This contains information such as the social media handle names that represent the user.
+
 ### Configuring Twitter Bot
 The `twitterbot.json
 
@@ -38,5 +40,5 @@ Scoring is determined as follows:
 * Locality: Messages that come from an author near a configured location are considered local to that location. Locality confidence is determined by matching the author's provided location information to that of the configuration. Locality confidence is a value 0.0 to 1.0 where 0.0 is certainly not local and 1.0 is certainly local. The product of `locality_multiplier` with the locality confidence awards a certain number of points for each message. Recommended value is `250`. A few examples with the recommended value would be: a locality confidence of 1.0 would award 250 points, a confidence of 0.5 would award 125 points, and a confidence of 0.1 would award 25 points.
 * Number of points per word in the message: Short messages are less intereting. It was once said the average length of a tweet is 6 characters. The number of points per word is configured in the `points_per_word` setting. Recommended value is `1`.
 * Shoutout Heck:  Many times a message may come in with many shoutouts (e.g. the `@` symbol) in it which are just very short messages that are designed to grab a lot of attention. This is an `integer` that will be decremented of the overall score per shoutout used. Recommended value is -50.
-
+* Shoutout to Me: If a message is directed to the user, additional scoring can happen. This is checked by comparing the references in the message compared to what is configured in the `user_identification` global.json setting under the sub-property `social_media_handles`. Recommended value is 500, to elevate these above the others.
 

@@ -3,6 +3,9 @@
 		"host" : "",
 		"index" : "",
 		"port" : 2900
+	},
+	"user_identification" : {
+		"social_media_handles" : []
 	}
 }
 	
