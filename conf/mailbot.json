@@ -9,7 +9,7 @@
 		}
 	],
 	"scoring": {
-		"disinterested_words": [],
+		"disinterested_words": {},
 		"hashtag_heck": 0,
 		"interested_words": {},
 		"locality_multiplier": 0,

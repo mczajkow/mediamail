@@ -131,7 +131,7 @@ class ElasticSearchHelper:
         if hashtags is not None and isinstance(hashtags, list):
             body['hashtags'] = hashtags
         if location is not None:
-            body['loation'] = location
+            body['location'] = location
         if localityConfidence is not None:
             lC = 0.0
             try:
@@ -144,6 +144,8 @@ class ElasticSearchHelper:
                 log.debug('Provided data has a locality confidence that is not between 0.0 and 1.0 inclusive. Ignoring.')
                 return
             body['locality_confidence'] = lC
+        else:
+            body['locality_confidence'] = 0.0 # Default is zero.
         if placeName is not None:
             body['place_name'] = placeName
         if placeFullName is not None:
@@ -369,32 +371,36 @@ class ScoringHelper:
         -- config dictionary, the loaded properties from the configuration files for the bot. Required, if None then an error is logged and nothing happens.
         @see ConfigFileHelper
         '''
+        self.conf = {}
         if config is None:
             log.error('Failed to initialize ScoringHelper as provided config dictionary is None. ScoringHelper is not set up properly.')
             return
+        if isinstance(config, dict):
+            log.error('Configuration passed into ScoringHelper is not a dictioanry. ScoringHelper is not set up properly.')
+            return
         self.conf = config
         
-    def scoreContent(self, contentHit):
+    def scoreContent(self, record):
         '''
         Takes data stored in Elastic Search and then assigns priority to it based on the content and what is in the configuration.
-        
+
+        -- record dictionary, a record found in Elastic Search. Required. If none, the default zero score is returned and a warning issued.        
         @return integer, the score for that query data based on configuration. Scores can be any number including negatives.
         @see DESIGN.md
         @see ElasticSearchHelper
         '''
-        if queryData is None:
-            log.warning('Could not score data as None was passed in.')
+        if record is None:
+            log.warning('Could not score data as None was passed in. Zero being returned')
+            return 0
+        if isinstance(record, dict) is False:
+            log.warning('Data passed into scoreContent is not a dictionary. Zero being returned')
             return 0
         # Similarly we need the section 'scoring' to be there too
         if 'scoring' not in self.conf:
             log.warning('There is no scoring section in the configuration. Returning 0.')
             return 0
         score = 0 # start off at zero
-        
-        # TODO --- Handle this after doing the stripping of content
-        
-        
-        # LENGTH
+        # LENGTH - score points based on how many tokens arein the record.
         if 'points_per_word' in self.conf['scoring']:
             ppw = 0
             try:
@@ -402,24 +408,56 @@ class ScoringHelper:
             except Exception as e:
                 # Not an integer?
                 log.debug('Could not utilize points_per_word in the scoring section of the configuration: '+str(e))
-            
-            
-                
-            if len(queryData...) > 0:
-                score += len(tweet_text) * ppwd                
+            if 'text' in record:
+                score += (len(record['text'].split(' ')) * ppw)
+            else:
+                log.debug('Data record from Elastic Search had no text in it. No length based scoring was done.')
         # LOCALITY
-        if self.localityCheckOfATweet(tweet_data):
-            priorityValue += 250
+        # TODO 6-Move-Locality-to-Mailbot. This should not come directly from the record but rather be determined here in this method with the record data.
+        # Note: decided not to put a partial implementation of this in and will circle back to handle this later.
+        if 'locality_multiplier' in self.conf['scoring']:
+            lm = 0
+            try:
+                lm = int(self.conf['scoring']['locality_multiplier'])
+            except Exception as e:
+                # Not an integer?
+                log.debug('Could not utilize locality_multiplier in the scoring section of the configuration: '+str(e))
+            if 'locality_confidence' in record:
+                score += float(lm) * record['locality_confidence']
         # TODO #7-Redesign-Follower-Scoring: Twitterchat had this capability but Mediamail has to implement this differently. It would need to be the follower of the user who gets the e-mail.
         # KEYWORDS of INTEREST
-        for ircBot in twitter_interested_words:
-            for word in twitter_interested_words[ircBot]:
-                if word.lower() in tweet_text.lower():
-                    priorityValue += 25
+        if 'interested_words' in self.conf['scoring']:
+            # Parse each one, provided a dictionary was given.
+            if isinstance(self.conf['scoring']['interested_words'], dict) is False:
+                log.debug('Could not score keywords of interest, the value provided in the configuration is not a dictionary of string:int. See DESIGN.md.')
+            else:
+                # For each keyword, check to see if it is in the record tokens in part. If so, score the points.
+                for keyword in self.conf['scoring']['interested_words']:
+                    points = 0
+                    try:
+                        points = int(self.conf['scoring']['interested_words'][keyword])
+                    except Exception as e:
+                        log.debug('Keyword of interest has a non-integer value for word: '+str(keyword))
+                    if 'text' in record and keyword.lower() in record['text'].lower():
+                        log.debug('Found a matching keyword: '+str(keyword)+' within the record.')
+                        score = score + points
         # KEYWORDS of DISINTEREST
-        for word in twitter_disinterested_words:
-            if word.lower() in tweet_text.lower():
-                priorityValue -= 25
+        if 'disinterested_words' in self.conf['scoring']:
+            # Parse each one, provided a dictionary was given.
+            if isinstance(self.conf['scoring']['disinterested_words'], dict) is False:
+                log.debug('Could not score keywords of disinterest, the value provided in the configuration is not a dictionary of string:int. See DESIGN.md.')
+            else:
+                # For each keyword, check to see if it is in the record tokens in part. If so, score the points.
+                for keyword in self.conf['scoring']['disinterested_words']:
+                    points = 0
+                    try:
+                        points = int(self.conf['scoring']['disinterested_words'][keyword])
+                    except Exception as e:
+                        log.debug('Keyword of disinterest has a non-integer value for word: '+str(keyword))
+                    if 'text' in record and keyword.lower() in record['text'].lower():
+                        log.debug('Found a matching keyword: '+str(keyword)+' within the record.')
+                        score = score - points
+        # TODO: Having a distinction between these two (interest and disinterest) makes no sense. Rather just a global keyword scoring allowing any positive or negative number makes better sense.
         # TODO #9-Implement Derivative Message Scoring: Re-work the index to store a flag for derived messages like re-tweets and then score them separately.
         # HASHTAG and SHOUTOUT HECK
         hashtags = len(tweet_text.split("#"))

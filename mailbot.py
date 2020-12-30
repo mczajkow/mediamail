@@ -83,23 +83,26 @@ class MailBot:
             log.debug('Result: ' + str(result))
             # TODO -- seems to be only bringing in small quantities. Paging?
             # Stip the results that come back using the helper function in ElasticSearchHelper. Turns results into an array.
-            resultArray = self.elasticSearchHelper.stripResults(result)
-            
-            
-            
-            self.parseResult(result, title, hitLimit)
-        # TODO -- now parse the results and built up scores for each of the hits.
+            strippedResult = self.elasticSearchHelper.stripResults(result)
+            if len(strippedResult) == 0:
+                # No results?
+                logger.debug('No results found when stripping the data from Elastic Search')
+                continue
+            # Now update the global reply record on each reply.
+            for reply in strippedResult:
+                self.updateGlobalReply(reply, query)
+
         # TODO -- then send out the mail
 
-    def parseResult(self, result, query):
+    def updateGlobalReply(self, record, query):
         '''
-        Parses a dictionary response from Elastic Search containing multiple messages. Scores each one and puts it in the globalReply. This method can be called on partial results of the supplied query in order to manage paged results from Elastic Search.
-        
-        -- result dictionary, the actual reply from Elastic Search containing part of all of the query response. Required. Without this, there's nothing to do and if None a warning will be issued and nothing will happen.
-        -- query dictionary, the input query dictionary from the configuration file. This contains metadata that helps parse the result and properly update globalReply. Without it, processing the result would fail and if None a warning is issued and nothing will happen.
+        Updates the global reply dictionary that contains all results to be mailed to the user.
+
+        -- record dictionary, a data record stored in Elastic Search's index that is to be scored and put into the global reply. Required. Without this there's nothing to do and a warning is issued before returning.
+        -- query dictionary, the query in the configuration used to generate this record as returning from a query to Elastic Search. Metadata found within the query is used to update the global reply. Required. Without this there is nothing to do and a warning is issued before returning.
         '''
-        if result is None:
-            log.warning('No result given to parseReply. Nothing will happen.')
+        if record is None:
+            log.warning('No record given to updateGlobalReply. Nothing will happen.')
             return 
         if query is None:
             log.warning('No input query given to parseReply. Nothing will happen.')
@@ -114,13 +117,10 @@ class MailBot:
             # First time set up. Copy in the original query contents because later we'll need the metadata when sending out the mail.
             globalReply[query['title']] : {}
             globalReply[query['title']]['originalQuery'] : query
-        # TODO -- Next, strip out the replies given by Elastic Search found in result.
-        # The content has to be parsed, see Utils' ElasticSearchHelper stripResults method...
+        # Generate the score for the reply, next.
         
-        # Now score the results found in the result list.
-        # score = self.scoringHelper.scoreContent(result)
-        # Now put that in the globalReply appropriately.
-        # -------------- DESIGN THIS NEXT ----------------------
+        # Update globalReply but only if the score is higher than the others in this section of the reply based on the hit_limit.
+        
         
     def sendMail(self):
         '''
