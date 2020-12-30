@@ -30,6 +30,15 @@ The `twitterbot.json
 
 `twitter`: This is access information needed to set up a Twitter connection and it also contains the user handle name used. To understand this more, please see: https://developer.twitter.com/en
 
+## Mailbot Design
+
+globalReply: Mailbot contains a dictionary `{}` containing lists `[]` of reponses where the key in the dictionary is the `title` given to the query found in the `queries` section of `mailbot.json`.  The list is populated with hits found in the Elastic Search database that match the query criteria. A `hit_limit` is respected. Once the limit is reached, only the highest scoring items in the list are kept. Each hit in the list of a reply is also a dictionary containing:
+
+* `score`: the score of the hit
+* `id`: the unique identification of the hit 
+* `text`: the fullly prepared message
+* `link`: direct URL to the actual message
+
 ## Scoring
 Each message sent to the user via an email has an `integer` score associated with it. This is determined by several factors which are configured in Mailbot's mailbot.json (see above). 
 

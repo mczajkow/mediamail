@@ -107,20 +107,32 @@ class MailBot:
         if query is None:
             log.warning('No input query given to parseReply. Nothing will happen.')
             return
-        # Set up entry in the globalReply first, if it doesn't already exist.
         # This requires title to be in the input query as that is the key in the dictionary.
         if 'title' not in query:
             # Also essential> Title is the unique ID of the query and used prominently in the e-mail
             log.warning('Query doesn\'t have any "title" criteria. Skipping over parsing results for '+str(query))
             continue
+        # And also the hit limit
+        hit_limit = 10
+        if 'hit_limit' not in query:
+            log.debug('Unspecified hit limit in the query entitled: '+str(query['title'])+". Using default of 10.")            
+        # Set up entry in the globalReply first, if it doesn't already exist.        
         if query['title'] not in self.globalReply:
             # First time set up. Copy in the original query contents because later we'll need the metadata when sending out the mail.
-            globalReply[query['title']] : {}
-            globalReply[query['title']]['originalQuery'] : query
+            globalReply[query['title']] : []
         # Generate the score for the reply, next.
+        scoreOfRecord = ScoringHelper.scoreContent(record)
+        # Check to see if the hit limit is reached
+        hit_limit = int(query['hit_limit'])
+        replyList = globalReply[query['title']]
+        if len(replyList) < hit_limit:
+            # Add this record on to the end
+            replyList += [prepareRecord(record,query)]            
+        else:
+            # We have to check to see if the score is higher than the other ones on the list.
+        # We then have to sort at the end..
         
         # Update globalReply but only if the score is higher than the others in this section of the reply based on the hit_limit.
-        
         
     def sendMail(self):
         '''
