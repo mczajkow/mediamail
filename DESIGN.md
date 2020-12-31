@@ -32,9 +32,41 @@ The `twitterbot.json
 
 ## Mailbot Design
 
-globalReply: Mailbot contains a dictionary `{}` containing lists `[]` of reponses where the key in the dictionary is the `title` given to the query found in the `queries` section of `mailbot.json`.  The list is populated with hits found in the Elastic Search database that match the query criteria. A `hit_limit` is respected. Once the limit is reached, only the highest scoring items in the list are kept. Each hit in the list of a reply is also a dictionary containing:
+globalReply: As queries to Elastic Search unfold, a global reply `list` is constructed that contains the replies to each query that are in a constructed format for an email. This data structure looks like this pseudo-JSON:
 
-* `score`: the score of the hit
+```
+"globalReply" : [
+ {
+  "title" : <The Title of the Query in the Configuration>,
+  "replies" : [
+   {
+    "id" : <See below>
+    "text" : <See below>
+    "link" : <See below>
+    "score" : <See below>
+   },
+   ...
+  ]
+ },
+ {
+  "title" : ...
+  "replies" : [
+   ...
+  ]
+ },
+ ...
+]
+```
+
+The ordering of this list matches that of the `queries` in the configuration, allowing for the user to indicate which replies are more important (and thus higher up) on the e-mail sent.
+
+The `globalReply` caps the limit on how many replies exist in each `replies` sub-list. As terms are added to the `replies` list, Mailbot will see if the length of this list exceeds `hit_limit`. If so, it eliminates the lowest scoring reply.
+
+The `replies` list is also always kept in order based on the `score` integer. This means the highest score item is at the top of the list.
+
+Contained within each `replies` dictionary are the following terms, all needed to be put in the e-mail:
+
+* `score`: the score of the hit, see Scoring.
 * `id`: the unique identification of the hit 
 * `text`: the fullly prepared message
 * `link`: direct URL to the actual message

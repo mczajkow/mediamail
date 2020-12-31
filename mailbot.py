@@ -15,9 +15,10 @@ class MailBot:
 
     def __init__(self, configFile): 
         '''
-         Initializes the MailBot, loading the configuration file.
+         Initializes the MailBot, loading the configuration file. It sets up internal class data fields as per the DESIGN.md.
          
         -- configFile string, the location of the configuration JSON used to configure this bot instance. Required, without it an error log is made and nothing happens further
+        -- @see DESIGN.md
         '''
         if configFile is None:
             log.error("Could not initialize MailBot with None config file")
@@ -47,14 +48,29 @@ class MailBot:
         log.info('Elastic Search setup complete.')
         # Set up the Scoring Helper.
         self.scoringHelper = ScoringHelper(self.conf)
-        # Finally, define the Mailbot's global result dictionary of replies:
-        self.globalReply = {}
-
+        # Finally, define the Mailbot's global result dictionary of replies. See DESIGN.md for details on its content structure.
+        self.globalReply = []
+        # Populate globalReply based on the contents of qwueries.
+        if 'queries' not in self.conf or isinstance(self.conf['queries'],list) is False:
+            log.error('No queries specified in the configuration. Nothing will be done by Mailbot.')
+            return
+        for query in self.conf['queries']:
+            if isinstance(query, dict) is False:
+                log.warning('A query in the queries configuration is not a dictionary. Rather it is: '+str(query)+". Skipping. See DESIGN.md")
+                continue
+            replyDictionary = {}
+            # Set up the contents, check to ensure they are there first.
+            if 'title' not in query:
+                log.warning('A query in the queries configuration has no title. This is necessary. Skipping: '+str(query))
+                continue
+            replyDictionary['title'] = query['title']
+            replyDictionary['replies'] = []
+            
     def executeQueries(self):
         '''
-        This method goes through every configured query and executes it on Elastic Search. It calls parseResult on each query's full result which then scores the results.        
+        This method goes through every configured query and executes it on Elastic Search. For each reply, it calls updateGlobalReply which then updates the globalReply list.
 
-        @see parseResult
+        @see updateGlobalReply
         '''
         # Check to see if queries is set in the configuration, first.
         if 'queries' not in self.conf:
@@ -92,7 +108,37 @@ class MailBot:
             for reply in strippedResult:
                 self.updateGlobalReply(reply, query)
 
-        # TODO -- then send out the mail
+    def prepareRecord(self, record, score=0):
+        '''
+        Creates a record to be put into the globalReply from an Elastic Search record passed in. See DESIGN.md for more information.
+        
+        -- record dictionary, an Elastic Search stored record. Required, if not given then None is returned.
+        -- score integer, the score of this record, see utils.ScoringHelper for more information. Optional, if not provided than a default 0 is used.
+        @return: dictionary or None. Dictionary containing the information meant for the email, see DESIGN.md, to be put into globalReply. None if the input record is bad.
+        '''
+        if record is None or isinstance(record, dict) is False:
+            return None
+        prepared = {}
+        prepared['score'] = score
+        if text in record:
+            prepared['text'] = record['text']
+        else:
+            log.warning('No text data found in Elastic Search record: '+str(record))
+            return None
+        # TODO: ID
+        # TODO: LINK
+
+    def sendMail(self):
+        '''
+        Sends the mail...
+        '''
+        return
+    
+    def sortGlobalReplyList(self, replyList):
+        '''
+        Sorts a replies sub-list found within the globalReply.
+        '''
+        return
 
     def updateGlobalReply(self, record, query):
         '''
@@ -112,33 +158,29 @@ class MailBot:
             # Also essential> Title is the unique ID of the query and used prominently in the e-mail
             log.warning('Query doesn\'t have any "title" criteria. Skipping over parsing results for '+str(query))
             continue
-        # And also the hit limit
+        # And also the hit limit needs to be there too, or use the default.
         hit_limit = 10
         if 'hit_limit' not in query:
-            log.debug('Unspecified hit limit in the query entitled: '+str(query['title'])+". Using default of 10.")            
-        # Set up entry in the globalReply first, if it doesn't already exist.        
-        if query['title'] not in self.globalReply:
-            # First time set up. Copy in the original query contents because later we'll need the metadata when sending out the mail.
-            globalReply[query['title']] : []
-        # Generate the score for the reply, next.
-        scoreOfRecord = ScoringHelper.scoreContent(record)
-        # Check to see if the hit limit is reached
-        hit_limit = int(query['hit_limit'])
-        replyList = globalReply[query['title']]
-        if len(replyList) < hit_limit:
-            # Add this record on to the end
-            replyList += [prepareRecord(record,query)]            
+            log.debug('Unspecified hit limit in the query entitled: '+str(query['title'])+". Using default of 10.")
         else:
-            # We have to check to see if the score is higher than the other ones on the list.
-        # We then have to sort at the end..
-        
-        # Update globalReply but only if the score is higher than the others in this section of the reply based on the hit_limit.
-        
-    def sendMail(self):
-        '''
-        Sends the mail...
-        '''
-        return
+            hit_limit = int(query['hit_limit'])
+        # Look up the replies entry in globalReply to use. See DESIGN.md for more information on the content.
+        replyToUse = None
+        for reply in self.globalReply:
+            if reply['title'] == query['title']:
+                replyToUse = reply
+        # Ensure that we have found the replyToUse before going forward.
+        if replyToUse is None:
+            # Didn't find it?
+            log.warning('Did not find the reply for query title: '+query['title']+' in the globalReply. The class wasn\'t set up right. Skipping updateGlobalReply for this title.')
+            return
+        repliesList = replyToUse['replies']
+        # Next, the score is needed to ascertain where it goes in the replyToUse's replies list (or if at all).
+        scoreOfRecord = ScoringHelper.scoreContent(record)
+        # Add the item at the end of the replies list.
+        repliesList += [prepareRecord(record,scoreOfRecord)]
+        # TODO.. Now sort the list based on the "score" contained.
+        # TODO.. Now chop off the items at the end of the list if they exceed hit_limit.
 
 def get_args():
     '''
