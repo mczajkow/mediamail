@@ -3,7 +3,7 @@
 ## Overview
 Media mail works as a trio of bots representing an interaction with a social media platform
 * Platform Bot: These reach out to a specific social media application, e.g. Twitter and funnel data into a common Elastic Search index
-* Mail Bot: These query the common Elastic Search index on behalf of a user, given user preferences
+* Mail Bot: These query the common Elastic Search index on behalf of a user, given user preferences. It then emails the user.
 * Reply Bot: These manage replies from a user, given user preferences, and then interact back with the social media Platform accordingly
 
 ## Configuration
@@ -31,6 +31,19 @@ The `twitterbot.json
 `twitter`: This is access information needed to set up a Twitter connection and it also contains the user handle name used. To understand this more, please see: https://developer.twitter.com/en
 
 ## Mailbot Design
+Mailbog queries the common Elastic Search index on behalf of a user given user preferences found in the configuration. Mailbot then turns each of these into an organized email. The structure of the e-mail is as follows:
+
+[Header Information]
+
+[Query A]
+* One line per matching hit, which looks like this:
+
+[`Author Screen Name`]:[`Author's Message`] (`Link to Author's Message`):[`Message ID`]:[`Debug Information`]
+
+[Query B]
+...
+
+[Footer Information]
 
 globalReply: As queries to Elastic Search unfold, a global reply `list` is constructed that contains the replies to each query that are in a constructed format for an email. This data structure looks like this pseudo-JSON:
 
@@ -40,10 +53,11 @@ globalReply: As queries to Elastic Search unfold, a global reply `list` is const
   "title" : <The Title of the Query in the Configuration>,
   "replies" : [
    {
-    "id" : <See below>
-    "text" : <See below>
-    "link" : <See below>
-    "score" : <See below>
+    "mmid" : <See below> Required.
+    "text" : <See below> Required.
+    "link" : <See below> Optional.
+    "score" : <See below> Required.
+    "author_screen_name" : <see below> Optional.
    },
    ...
   ]
@@ -67,9 +81,10 @@ The `replies` list is also always kept in order based on the `score` integer. Th
 Contained within each `replies` dictionary are the following terms, all needed to be put in the e-mail:
 
 * `score`: the score of the hit, see Scoring.
-* `id`: the unique identification of the hit 
+* `mmid`: the unique identification of the hit 
 * `text`: the fullly prepared message
 * `link`: direct URL to the actual message
+* `author_screen_name` : the screen name of the author as per the media platform
 
 ## Scoring
 Each message sent to the user via an email has an `integer` score associated with it. This is determined by several factors which are configured in Mailbot's mailbot.json (see above). 
@@ -82,4 +97,9 @@ Scoring is determined as follows:
 * Number of points per word in the message: Short messages are less intereting. It was once said the average length of a tweet is 6 characters. The number of points per word is configured in the `points_per_word` setting. Recommended value is `1`.
 * Shoutout Heck:  Many times a message may come in with many shoutouts (e.g. the `@` symbol) in it which are just very short messages that are designed to grab a lot of attention. This is an `integer` that will be decremented of the overall score per shoutout used. Recommended value is -50.
 * Shoutout to Me: If a message is directed to the user, additional scoring can happen. This is checked by comparing the references in the message compared to what is configured in the `user_identification` global.json setting under the sub-property `social_media_handles`. Recommended value is 500, to elevate these above the others.
+
+## Glossary
+* message: Every social media platform contains messages, e.g. posts, Tweets, etc. This term is broadly used to describe a specific instance.
+* user: The recipient of the product of media mail. The user peruses the product and interacts with it to generate replies. 
+
 

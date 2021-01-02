@@ -120,13 +120,21 @@ class MailBot:
             return None
         prepared = {}
         prepared['score'] = score
-        if text in record:
+        if 'text' in record:
             prepared['text'] = record['text']
         else:
             log.warning('No text data found in Elastic Search record: '+str(record))
             return None
-        # TODO: ID
-        # TODO: LINK
+        if 'mmid' in record:
+            prepared['mmid'] = record['mmid']
+        else:
+            log.warning('No Media Mail ID (mmid) found in Elastic Search record: '+str(record))
+            return None
+        if 'link' in record:
+            prepared['link'] = record['link']
+        if 'author_screen_name' in record:
+            prepared['author_screen_name'] = record['author_screen_name']
+        return prepared
 
     def sendMail(self):
         '''
@@ -134,11 +142,16 @@ class MailBot:
         '''
         return
     
-    def sortGlobalReplyList(self, replyList):
+    def sortReplies(self, replyList):
         '''
-        Sorts a replies sub-list found within the globalReply.
+        Used in the built-in sorted methof of Python. It utilizes the 'score' of the replyList.
+        
+        -- replyList list, see DESIGN.md. The replyList is what goes into the "replies" part of each globalReply record. Required, without it a 0 is returned.
+        @return will return the 'score' found in the replyList, or 0 if there is no score found.
         '''
-        return
+        if replyList is None or 'score' not in replyList:
+            return 0
+        return replyList['score']
 
     def updateGlobalReply(self, record, query):
         '''
@@ -158,12 +171,18 @@ class MailBot:
             # Also essential> Title is the unique ID of the query and used prominently in the e-mail
             log.warning('Query doesn\'t have any "title" criteria. Skipping over parsing results for '+str(query))
             continue
-        # And also the hit limit needs to be there too, or use the default.
+        # The hit limit needs to be there too, or use the default.
         hit_limit = 10
         if 'hit_limit' not in query:
             log.debug('Unspecified hit limit in the query entitled: '+str(query['title'])+". Using default of 10.")
         else:
             hit_limit = int(query['hit_limit'])
+        # The author screen name should be there, or use Unidentified
+        screen_name = "Unidentified"
+        if 'author_screen_name' not in record:
+            log.debug('Unspecified screen name in the query reply. Using the Unidentified default.')
+        else:
+            screen_name = record['author_screen_name']            
         # Look up the replies entry in globalReply to use. See DESIGN.md for more information on the content.
         replyToUse = None
         for reply in self.globalReply:
@@ -178,9 +197,20 @@ class MailBot:
         # Next, the score is needed to ascertain where it goes in the replyToUse's replies list (or if at all).
         scoreOfRecord = ScoringHelper.scoreContent(record)
         # Add the item at the end of the replies list.
-        repliesList += [prepareRecord(record,scoreOfRecord)]
-        # TODO.. Now sort the list based on the "score" contained.
-        # TODO.. Now chop off the items at the end of the list if they exceed hit_limit.
+        preparedRecord = prepareRecord(record,scoreOfRecord)
+        if preparedRecord is not None:
+            repliesList += [preparedRecord]
+        else:
+            log.warning('The incoming match from Elastic Search was missing data. Skipping as part of the mail to the user.')
+        # Sort the list based on the "score" contained.
+        sortedList = sorted(repliesList,key=sortReplies)
+        # Chop off the items at the end of the list if they exceed hit_limit.
+        choppedList = sortedList[:hit_limit]
+        # Put that choppedList back into the globalReply.
+        # TODO: I think we could just use the replyToUse.
+        for reply in self.globalReply:
+            if reply['title'] == query['title']:
+                reply['replies'] = choppedList
 
 def get_args():
     '''

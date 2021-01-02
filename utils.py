@@ -1,5 +1,6 @@
 import logging
 import json
+import time
 from elasticsearch import Elasticsearch
 from importlib.metadata import EntryPoint
 
@@ -78,6 +79,21 @@ class ElasticSearchHelper:
         except Exception as e:
             log.error('Failed to initialize connection to Elastic Search: ' + str(e))
         self.elasticSearchIndex = elasticSearchIndex
+        
+    def generateID(self):
+        '''
+        Media Mail needs an ID associated with each record to be put into the Elastic Search record store. This is for easy lookup later. IDs are 4 alpha-numeric characters associated on wall-clock time with a roll-around about every 30 days with the seed being 1/10th of one second.  
+        
+        @return string, four character symbol
+        '''
+        # There are 2,592,200 seconds in 30 days, and thus 
+        totalCodes = 25922000 # codes, for 1/10th of a second.
+        # Get now time to the precision of 10ths of a second past epoch.
+        timeNow = int(time.time()*10)
+        # Code to use:
+        codeUsed = timeNow % totalCodes
+        # Now that we know what code it is, translate it into the code.
+        # TODO...
     
     def query(self, queryDict):
         '''
