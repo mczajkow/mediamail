@@ -31,7 +31,7 @@ The `twitterbot.json
 `twitter`: This is access information needed to set up a Twitter connection and it also contains the user handle name used. To understand this more, please see: https://developer.twitter.com/en
 
 ## Mailbot Design
-Mailbog queries the common Elastic Search index on behalf of a user given user preferences found in the configuration. Mailbot then turns each of these into an organized email which is sent to the `address` found in the configuration under the `email` section. The structure of the e-mail is as follows:
+Mailbog queries the common Elastic Search index on behalf of a user given user preferences found in the configuration. Mailbot then turns each of these into an organized email which is sent to the `user_address` found in the configuration under the `email` section. The structure of the e-mail is as follows:
 
 [Header Information]
 * The `title` found in the `email` section of the configuration is the leading line.

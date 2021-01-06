@@ -1,7 +1,12 @@
 {
 	"email" : {
-		"address" : "",
-		"title" : ""
+		"sender_address" : "",
+		"smtp_password" : "",
+		"smtp_port" : 0,
+		"smtp_server" : "",
+		"smtp_username" : "",
+		"title" : "",
+		"user_address" : ""
 	}
 	"queries": [
 		{

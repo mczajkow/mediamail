@@ -1,11 +1,11 @@
 import argparse
 import jaraco.logging
 import logging
+import smtplib
+import ssl
 from utils import ConfigFileHelper, ElasticSearchHelper, ScoringHelper
-from builtins import None
 
 log = logging.getLogger(__name__)
-
 
 class MailBot:
     '''
@@ -144,6 +144,24 @@ class MailBot:
         '''
         Takes what is currently in the globalReply and sends it to the user.
         '''
+        # Check configuration for critically needed values.
+        # SMTP Host, Port, User and Sender Address check
+        if 'smtp_host' not in self.conf['email'] or self.conf['email']['smtp_host'] is None:
+            # No host, no email.
+            log.error('Could not send email, no SMTP host set in configuration.')
+            return
+        if 'smtp_port' not in self.conf['email'] or self.conf['email']['smtp_port'] is None:
+            # No port, no email.
+            log.error('Could not send email, no SMTP port set in configuration.')
+            return
+        if 'user_address' not in self.conf['email'] or self.conf['email']['user_address'] is None:
+            # No sender address, no email.
+            log.error('Could not send email, no user address set in configuration.')
+            return
+        if 'sender_address' not in self.conf['email'] or self.conf['email']['sender_address'] is None:
+            # No sender address, no email.
+            log.error('Could not send email, no sender address set in configuration.')
+            return
         # Prepare the header
         header = "MediaMail Email"
         if 'title' in self.conf['email'] and self.conf['email']['title'] is not None:
@@ -181,7 +199,32 @@ class MailBot:
         # Assemble
         message = header + body + footer
         # Send mail
-        return
+        smtp_host = self.conf['email']['smtp_host']
+        smtp_port = int(self.conf['email']['smtp_port'])
+        sender_email = self.conf['email']['sender_address']
+        user_email = self.conf['email']['user_address']    
+        sender_username = None
+        if "sender_username" in self.conf['email'] and self.conf['email']['sender_username'] is not None:
+            sender_username = self.conf['email']['sender_username']
+        sender_password = None
+        if "sender_password" in self.conf['email'] and self.conf['email']['sender_password'] is not None:
+            sender_username = self.conf['email']['sender_password']
+        context = ssl.create_default_context()
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.ehlo()  # Can be omitted
+            server.starttls(context=context)
+            server.ehlo()  # Can be omitted
+            # Only log on if username and password is presented.
+            if sender_username is not None and sender_password is not None:
+                server.login(sender_username, sender_password)
+            # Send the message
+            log.debug('Sending message to user email: '+str(user_email)+" Message is: "+str(message))
+            try:
+                server.sendmail(sender_email, user_email, message)
+            except Exception as e:
+                log.error('Failed to send message: '+str(e))
+                return
+            log.debug('Sent Successfully!')
     
     def sortReplies(self, replyList):
         '''
