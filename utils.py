@@ -110,7 +110,7 @@ class ElasticSearchHelper:
         except Exception as e:
             log.error('Failed query to Elastic Search for this query: ' + str(queryDict) + " Error is: " + str(e))
         
-    def storeData(self, author=None, authorLocation=None, authorScreenName='Unknown', createdAt=None, hashtags=[], location=None, localityConfidence=0.0, placeName=None, placeFullName=None, polarity=None, references=[], source=None, sentiment=None, subjectivity=None, text=None, tokens=[]):
+    def storeData(self, author=None, authorLocation=None, authorScreenName='Unknown', createdAt=None, hashtags=[], location=None, localityConfidence=0.0, placeName=None, placeFullName=None, polarity=None, references=[], source=None, sentiment=None, subjectivity=None, text=None, tokens=[], url=None):
         '''
         Stores data given into ElasticSearch.
         
@@ -130,6 +130,7 @@ class ElasticSearchHelper:
         -- subjectivity float, a number -1.0 to 1.0. @see https://en.wikipedia.org/wiki/Sentiment_analysis. Optional, not required to be put into the index. If provided, it must be a float type within the range. If not, it will not be put into the index.
         -- text string, the body of the message being indexed. Required, without it there is no data. If not provided, then a DEBUG log will be made and nothing done.
         -- tokens list of string, the text of the message broken down into single words for token matching purposes. Optional, if not provided then an empty list is indexed.
+        -- url string, the URL directly to the message on the media platform. Optional. If not supplied, nothing will be put in the index.
         '''
         body = {}
         # Check each field for None and then do the appropriate actions.
@@ -200,6 +201,8 @@ class ElasticSearchHelper:
             return
         if tokens is not None and isinstance(tokens, list):
             body['tokens'] = tokens
+        # TODO: Put in the link to the message URL
+        # TODO: Put in the mmid
         log.debug('Inserting into Elastic Search this body: ' + str(body))
         try:
             self.elasticSearch.index(index=self.elasticSearchIndex,

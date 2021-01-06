@@ -1,4 +1,8 @@
 {
+	"email" : {
+		"address" : "",
+		"title" : ""
+	}
 	"queries": [
 		{
 			"hit_limit" : 0,

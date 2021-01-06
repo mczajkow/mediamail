@@ -26,6 +26,10 @@ class MailBot:
         log.info("Initializing MailBot with config file: " + configFile)
         configHelper = ConfigFileHelper(configFile)
         self.conf = configHelper.getConf()
+        # Check for critical things needed in the configuration.
+        if "email" not in self.conf:
+            log.error('No email section found in the configuration. Failing out.')
+            return        
         # Elastic Search: setup
         if 'elastic' not in self.conf:
             # No elastic search means nothing we can insert data into. Fail out.
@@ -50,7 +54,7 @@ class MailBot:
         self.scoringHelper = ScoringHelper(self.conf)
         # Finally, define the Mailbot's global result dictionary of replies. See DESIGN.md for details on its content structure.
         self.globalReply = []
-        # Populate globalReply based on the contents of qwueries.
+        # Populate globalReply based on the contents of queries.
         if 'queries' not in self.conf or isinstance(self.conf['queries'],list) is False:
             log.error('No queries specified in the configuration. Nothing will be done by Mailbot.')
             return
@@ -102,7 +106,7 @@ class MailBot:
             strippedResult = self.elasticSearchHelper.stripResults(result)
             if len(strippedResult) == 0:
                 # No results?
-                logger.debug('No results found when stripping the data from Elastic Search')
+                log.debug('No results found when stripping the data from Elastic Search')
                 continue
             # Now update the global reply record on each reply.
             for reply in strippedResult:
@@ -138,8 +142,45 @@ class MailBot:
 
     def sendMail(self):
         '''
-        Sends the mail...
+        Takes what is currently in the globalReply and sends it to the user.
         '''
+        # Prepare the header
+        header = "MediaMail Email"
+        if 'title' in self.conf['email'] and self.conf['email']['title'] is not None:
+            header = self.conf['email']['title']
+        # Generate the body
+        body = "\n"
+        for reply in self.globalReply:
+            # Set the reply title...
+            replyTitle = "Unspecified Title"
+            if 'title' in reply and reply['title'] is not None:
+                replyTitle = reply['title']
+            body += replyTitle + "\n"
+            # Generate a line for each of the replies
+            for line in reply['replies']:
+                screenName = "Unknown"
+                if line['author_screen_name'] is not None:
+                    screenName = line['author_screen_name']
+                message = "Unspecified Message"
+                if line['text'] is not None:
+                    message = line['text']
+                link = "No link"
+                if line['link'] is not None:
+                    link = line['link']
+                mmid = "[NONE]"
+                if line['mmid'] is not None:
+                    mmid = line['mmid']
+                score = 0
+                if line['score'] is not None:
+                    score = line['score']
+                # TODO: Put debug information like score in optionally.
+                body += screenName +': '+message+' ('+link+'):['+mmid+'] ['+str(score)+']\n'
+            body += "\n" # Separator for the next reply.
+        # Prepare the footer
+        footer = ""
+        # Assemble
+        message = header + body + footer
+        # Send mail
         return
     
     def sortReplies(self, replyList):
@@ -197,13 +238,13 @@ class MailBot:
         # Next, the score is needed to ascertain where it goes in the replyToUse's replies list (or if at all).
         scoreOfRecord = ScoringHelper.scoreContent(record)
         # Add the item at the end of the replies list.
-        preparedRecord = prepareRecord(record,scoreOfRecord)
+        preparedRecord = self.prepareRecord(record,scoreOfRecord)
         if preparedRecord is not None:
             repliesList += [preparedRecord]
         else:
             log.warning('The incoming match from Elastic Search was missing data. Skipping as part of the mail to the user.')
         # Sort the list based on the "score" contained.
-        sortedList = sorted(repliesList,key=sortReplies)
+        sortedList = sorted(repliesList,key=self.sortReplies,reverse=True)
         # Chop off the items at the end of the list if they exceed hit_limit.
         choppedList = sortedList[:hit_limit]
         # Put that choppedList back into the globalReply.
