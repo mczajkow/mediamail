@@ -1,19 +1,17 @@
 {
-	"email" : {
-		"sender_address" : "",
-		"smtp_password" : "",
-		"smtp_port" : 0,
-		"smtp_server" : "",
-		"smtp_username" : "",
-		"title" : "",
-		"user_address" : ""
-	}
+	"email": {
+		"sender_address": "",
+		"smtp_password": "",
+		"smtp_port": 0,
+		"smtp_server": "",
+		"smtp_username": "",
+		"title": "",
+		"user_address": ""
+	},
 	"queries": [
 		{
-			"hit_limit" : 0,
-			"query": {
-				"query": {}
-			},
+			"hit_limit": 0,
+			"query": {},
 			"title": ""
 		}
 	],
@@ -24,7 +22,7 @@
 		"locality_multiplier": 0,
 		"minimum_score": 0,
 		"points_per_word": 0,
-		"references_to_me" : 0,
+		"references_to_me": 0,
 		"shoutout_heck": 0
 	}
 }

@@ -254,7 +254,7 @@ class MailBot:
         if 'title' not in query:
             # Also essential> Title is the unique ID of the query and used prominently in the e-mail
             log.warning('Query doesn\'t have any "title" criteria. Skipping over parsing results for '+str(query))
-            continue
+            return
         # The hit limit needs to be there too, or use the default.
         hit_limit = 10
         if 'hit_limit' not in query:
@@ -323,8 +323,11 @@ def main():
     jaraco.logging.setup(options)
     mb = MailBot(options.config_file)
     # Now execute all queries.
+    log.info('Executing all configured queries.')
     mb.executeQueries()
-
+    log.info('Sending mail')
+    mb.sendMail()
+    log.info("Sent. Done!")
 
 if __name__ == "__main__":
     '''

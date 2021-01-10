@@ -1,3 +1,4 @@
+import base62
 import logging
 import json
 import time
@@ -82,18 +83,19 @@ class ElasticSearchHelper:
         
     def generateID(self):
         '''
-        Media Mail needs an ID associated with each record to be put into the Elastic Search record store. This is for easy lookup later. IDs are 4 alpha-numeric characters associated on wall-clock time with a roll-around about every 30 days with the seed being 1/10th of one second.  
+        Media Mail needs an ID associated with each record to be put into the Elastic Search record store. This is for easy lookup later. IDs are 5 alpha-numeric characters based on wall time.
         
-        @return string, four character symbol
+         @return string, 5 characters long [A-Za-z0-9] unique to the 1/100th of a second.
         '''
-        # There are 2,592,200 seconds in 30 days, and thus 
-        totalCodes = 25922000 # codes, for 1/10th of a second.
-        # Get now time to the precision of 10ths of a second past epoch.
-        timeNow = int(time.time()*10)
-        # Code to use:
-        codeUsed = timeNow % totalCodes
-        # Now that we know what code it is, translate it into the code.
-        # TODO...
+        # The code generated is based on the hundreths of second past epoch
+        timeNow = int(time.time()*100)
+        # We use a reference number (62^5-1) to generate five 62-digit characters
+        totalCodes = (62*62*62*62*62)-1
+        # timeNow % totalCodes gives us a unique number for this 1/100th of 1 second.
+        # this is unique for 916132832 1/100ths of a second or about 3.5 months.
+        code = timeNow % totalCodes
+        code62 = base52.encode(code).zfill(5)
+        return code62
     
     def query(self, queryDict):
         '''
@@ -201,8 +203,12 @@ class ElasticSearchHelper:
             return
         if tokens is not None and isinstance(tokens, list):
             body['tokens'] = tokens
-        # TODO: Put in the link to the message URL
-        # TODO: Put in the mmid
+        if url is not None:
+            body['url'] = url
+        # Generate a unique ID.
+        body['mmid'] = this.generateID()
+        # wait 0.01 to the next record, to ensure it would have a unique mmid.
+        time.sleep(0.01)
         log.debug('Inserting into Elastic Search this body: ' + str(body))
         try:
             self.elasticSearch.index(index=self.elasticSearchIndex,
@@ -237,14 +243,14 @@ class ElasticSearchHelper:
         if response is None:
             log.warning('None was passed into stripResults. Empty list being returned.')
             return []
-        if isinstance(response, dictionary) is False:
+        if isinstance(response, dict) is False:
             log.warning('A non dictionary was passed into stripResults. Empty list being returned.')
             return []
         if 'hits' not in response:
             log.warning('Hits not found in the dictionary passed in. Empty list being returned.')
             return []
         hits1 = response['hits']
-        if isinstance(hits1, dictionary) is False:
+        if isinstance(hits1, dict) is False:
             log.warning('A non dictionary was found under hits of the response passed in. Empty list being returned.')
             return []
         if 'hits' not in hits1:
@@ -408,8 +414,8 @@ class ScoringHelper:
         if config is None:
             log.error('Failed to initialize ScoringHelper as provided config dictionary is None. ScoringHelper is not set up properly.')
             return
-        if isinstance(config, dict):
-            log.error('Configuration passed into ScoringHelper is not a dictioanry. ScoringHelper is not set up properly.')
+        if isinstance(config, dict) is False:
+            log.error('Configuration passed into ScoringHelper is not a dictionary. ScoringHelper is not set up properly.')
             return
         self.conf = config
         
