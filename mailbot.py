@@ -1,8 +1,10 @@
 import argparse
+import email.utils
 import jaraco.logging
 import logging
 import smtplib
 import ssl
+from email.mime.text import MIMEText
 from utils import ConfigFileHelper, ElasticSearchHelper, ScoringHelper
 
 log = logging.getLogger(__name__)
@@ -184,10 +186,10 @@ class MailBot:
                 message = "Unspecified Message"
                 if 'text' in line and line['text'] is not None:
                     message = line['text']
-                link = "No link"
+                link = ""
                 # Link is optional, it doesn't have to be there.
                 if 'link' in line and line['link'] is not None:
-                    link = line['link']
+                    link = ' (' + line['link'] + '):'
                 mmid = "[NONE]"
                 if 'mmid' in line and line['mmid'] is not None:
                     mmid = line['mmid']
@@ -195,16 +197,15 @@ class MailBot:
                 if 'score' in line and line['score'] is not None:
                     score = line['score']
                 # TODO: Put debug information like score in optionally.
-                body += screenName + ': ' + message + ' (' + link + '):[' + mmid + '] [' + str(score) + ']\n'
+                body += screenName + ': ' + message + link + '[' + mmid + '] [' + str(score) + ']\n'
             body += "\n"  # Separator for the next reply.
         # Prepare the footer
         footer = ""
-        # Assemble
-        message = header + body + footer
-        message = 'Subject: {}\n\n{}'.format("HopeIn SJ Email", message)
+        # Assemble the full body
+        fullBody = header + '\n' + body + '\n' + footer
         # Remove all characters not ascii.
-        message = message.encode('ascii', errors='ignore')
-        # Send mail
+        fullBody = fullBody.encode('ascii', errors='ignore')
+        # Now gather the meta data and put into a MIMEText
         smtp_host = self.conf['email']['smtp_host']
         smtp_port = int(self.conf['email']['smtp_port'])
         sender_email = self.conf['email']['sender_address']
@@ -215,6 +216,14 @@ class MailBot:
         smtp_password = None
         if 'smtp_password' in self.conf['email'] and self.conf['email']['smtp_password'] is not None:
             smtp_password = self.conf['email']['smtp_password']
+        # Create the header MIMEText
+        eml = MIMEText(fullBody,_charset='UTF-8')
+        eml['Subject'] = 'Your Latest Social Media Search Results'
+        eml['Message-ID'] = email.utils.make_msgid()
+        eml['Date'] = email.utils.formatdate(localtime=1)
+        eml['From'] = sender_email
+        eml['To'] = user_email
+        # Send tha mail
         context = ssl.create_default_context()
         with smtplib.SMTP(smtp_host, smtp_port) as server:
             server.ehlo()  # Can be omitted
@@ -226,8 +235,8 @@ class MailBot:
                 server.login(smtp_username, smtp_password)
             # Send the message
             try:
-                log.debug('Sending message from: '+str(sender_email)+' to user email: ' + str(user_email) + " Message is: " + str(message))
-                server.sendmail(sender_email, user_email, message)
+                log.debug('Sending message from: '+str(sender_email)+' to user email: ' + str(user_email) + " Message is: " + eml.as_string())
+                server.sendmail(eml['From'], { eml['To'], sender_email }, eml.as_string())
             except Exception as e:
                 log.error('Failed to send message: ' + str(e))
                 return
