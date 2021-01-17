@@ -9,7 +9,6 @@ from utils import ConfigFileHelper, ElasticSearchHelper, ScoringHelper
 
 log = logging.getLogger(__name__)
 
-
 class MailBot:
     '''
     Mail bot acts on behalf of a particular user to search over the contents of the Elastic Search index, score messages, and deliver them to an email account.
@@ -105,7 +104,7 @@ class MailBot:
             log.debug('Query to Elastic Search is: ' + str(queryDict))
             result = self.elasticSearchHelper.query(queryDict)
             log.debug('Result: ' + str(result))
-            # TODO -- seems to be only bringing in small quantities. Paging?
+            # TODO #13-Page-Results-From-Elastic-Search: seems to be only bringing in small quantities. Paging?
             # Stip the results that come back using the helper function in ElasticSearchHelper. Turns results into an array.
             strippedResult = self.elasticSearchHelper.stripResults(result)
             if len(strippedResult) == 0:
@@ -138,8 +137,8 @@ class MailBot:
         else:
             log.warning('No Media Mail ID (mmid) found in Elastic Search record: ' + str(record))
             return None
-        if 'link' in record:
-            prepared['link'] = record['link']
+        if 'url' in record:
+            prepared['link'] = record['url']
         if 'author_screen_name' in record:
             prepared['author_screen_name'] = record['author_screen_name']
         return prepared
@@ -186,7 +185,7 @@ class MailBot:
                 message = "Unspecified Message"
                 if 'text' in line and line['text'] is not None:
                     message = line['text']
-                link = ""
+                link = " "
                 # Link is optional, it doesn't have to be there.
                 if 'link' in line and line['link'] is not None:
                     link = ' (' + line['link'] + '):'
@@ -196,7 +195,7 @@ class MailBot:
                 score = 0
                 if 'score' in line and line['score'] is not None:
                     score = line['score']
-                # TODO: Put debug information like score in optionally.
+                # TODO #14-Debug-Info-in-Mailbot-Emails: Put debug information like score in optionally.
                 body += screenName + ': ' + message + link + '[' + mmid + '] [' + str(score) + ']\n'
             body += "\n"  # Separator for the next reply.
         # Prepare the footer
@@ -238,7 +237,7 @@ class MailBot:
                 log.debug('Sending message from: '+str(sender_email)+' to user email: ' + str(user_email) + " Message is: " + eml.as_string())
                 server.sendmail(eml['From'], { eml['To'], sender_email }, eml.as_string())
             except Exception as e:
-                # TODO: There seems to be error code 550 coming back that I can't send the emails. Should we retry?
+                # TODO #15-Mailbot-to-Handle-SMTP-Errors: There seems to be error code 550 coming back that I can't send the emails. Should we retry?
                 log.error('Failed to send message: ' + str(e))
                 return
             log.debug('Sent Successfully!')

@@ -63,18 +63,21 @@ class ElasticSearchHelper:
 
     def __init__(self, elasticSearchHost, elasticSearchPort, elasticSearchIndex):
         '''
-        Initializes the ElasticSearchhelper
+        Initializes the ElasticSearchhelper class instance
         
-        # TODO        
+        -- elasticSearchHost string, the host name where to find Elastic Search. Required, if not given, an error will be issued and the class will not set up a connection.
+        -- elasticSearchPort integer, the port to connect to Elastic Search with. Required, if not given, an error will be issued and the class will not set up a connection.
+        -- elasticSearchIndex string, the name of the index to send data and queries to. Required, if not given, an error will be issued and the class will not set up a connection.
         '''
         if elasticSearchHost is None:
-            log.warning('Could not initialize Elastic Search with a None host name given.')
+            log.error('Could not initialize Elastic Search with a None host name given.')
             return
         if elasticSearchPort is None:
-            log.warning('Could not initialize Elastic Search with a None port given.')
+            log.error('Could not initialize Elastic Search with a None port given.')
             return
         if elasticSearchIndex is None:
-            log.warning('Could not initialize Elastic Search because the index supplied is None.')
+            log.error('Could not initialize Elastic Search because the index supplied is None.')
+            return
         try:
             self.elasticSearch = Elasticsearch(['http://' + elasticSearchHost + ':' + str(elasticSearchPort)])
         except Exception as e:
@@ -496,7 +499,7 @@ class ScoringHelper:
                     if 'text' in record and keyword.lower() in record['text'].lower():
                         log.debug('Found a matching keyword: '+str(keyword)+' within the record.')
                         score = score - points
-        # TODO: Having a distinction between these two (interest and disinterest) makes no sense. Rather just a global keyword scoring allowing any positive or negative number makes better sense.
+        # TODO #17-Eliminate-Interest-and-Disinterest-Word-Scoring: Having a distinction between these two (interest and disinterest) makes no sense. Rather just a global keyword scoring allowing any positive or negative number makes better sense.
         # TODO #9-Implement Derivative Message Scoring: Re-work the index to store a flag for derived messages like re-tweets and then score them separately.
         # HASHTAG and SHOUTOUT HECK
         if 'hashtags' in record and isinstance(record['hashtags'], list) and len(record['hashtags']) > 0:
