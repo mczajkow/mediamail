@@ -7,6 +7,7 @@ from utils import ConfigFileHelper, ElasticSearchHelper, ScoringHelper
 
 log = logging.getLogger(__name__)
 
+
 class MailBot:
     '''
     Mail bot acts on behalf of a particular user to search over the contents of the Elastic Search index, score messages, and deliver them to an email account.
@@ -55,20 +56,21 @@ class MailBot:
         # Finally, define the Mailbot's global result dictionary of replies. See DESIGN.md for details on its content structure.
         self.globalReply = []
         # Populate globalReply based on the contents of queries.
-        if 'queries' not in self.conf or isinstance(self.conf['queries'],list) is False:
+        if 'queries' not in self.conf or isinstance(self.conf['queries'], list) is False:
             log.error('No queries specified in the configuration. Nothing will be done by Mailbot.')
             return
         for query in self.conf['queries']:
             if isinstance(query, dict) is False:
-                log.warning('A query in the queries configuration is not a dictionary. Rather it is: '+str(query)+". Skipping. See DESIGN.md")
+                log.warning('A query in the queries configuration is not a dictionary. Rather it is: ' + str(query) + ". Skipping. See DESIGN.md")
                 continue
             replyDictionary = {}
             # Set up the contents, check to ensure they are there first.
             if 'title' not in query:
-                log.warning('A query in the queries configuration has no title. This is necessary. Skipping: '+str(query))
+                log.warning('A query in the queries configuration has no title. This is necessary. Skipping: ' + str(query))
                 continue
             replyDictionary['title'] = query['title']
             replyDictionary['replies'] = []
+            self.globalReply += [replyDictionary]
             
     def executeQueries(self):
         '''
@@ -89,15 +91,15 @@ class MailBot:
             # First check for key components of the query that have to be there for Mailbot to function.
             if 'query' not in query:
                 # This is critically essential. If not there, log a warning and continue on.
-                log.warning('Query doesn\'t have any "query" criteria. Skipping over: '+str(query))
+                log.warning('Query doesn\'t have any "query" criteria. Skipping over: ' + str(query))
                 continue
             if 'title' not in query:
                 # Also essential> Title is the unique ID of the query and used prominently in the e-mail
-                log.warning('Query doesn\'t have any "title" criteria. Skipping over '+str(query))
+                log.warning('Query doesn\'t have any "title" criteria. Skipping over ' + str(query))
                 continue
             # Pull out the "query" part and stick that in its own dictionary. The rest of it is metadata needed later, e.g. 'title'
             # Elastic search will not want any of that, it just wants a dictionary with one term: "query"
-            queryDict = { "query" : query["query"] }
+            queryDict = { "query": query["query"] }
             log.debug('Query to Elastic Search is: ' + str(queryDict))
             result = self.elasticSearchHelper.query(queryDict)
             log.debug('Result: ' + str(result))
@@ -127,12 +129,12 @@ class MailBot:
         if 'text' in record:
             prepared['text'] = record['text']
         else:
-            log.warning('No text data found in Elastic Search record: '+str(record))
+            log.warning('No text data found in Elastic Search record: ' + str(record))
             return None
         if 'mmid' in record:
             prepared['mmid'] = record['mmid']
         else:
-            log.warning('No Media Mail ID (mmid) found in Elastic Search record: '+str(record))
+            log.warning('No Media Mail ID (mmid) found in Elastic Search record: ' + str(record))
             return None
         if 'link' in record:
             prepared['link'] = record['link']
@@ -177,52 +179,57 @@ class MailBot:
             # Generate a line for each of the replies
             for line in reply['replies']:
                 screenName = "Unknown"
-                if line['author_screen_name'] is not None:
+                if 'author_screen_name' in line and line['author_screen_name'] is not None:
                     screenName = line['author_screen_name']
                 message = "Unspecified Message"
-                if line['text'] is not None:
+                if 'text' in line and line['text'] is not None:
                     message = line['text']
                 link = "No link"
-                if line['link'] is not None:
+                # Link is optional, it doesn't have to be there.
+                if 'link' in line and line['link'] is not None:
                     link = line['link']
                 mmid = "[NONE]"
-                if line['mmid'] is not None:
+                if 'mmid' in line and line['mmid'] is not None:
                     mmid = line['mmid']
                 score = 0
-                if line['score'] is not None:
+                if 'score' in line and line['score'] is not None:
                     score = line['score']
                 # TODO: Put debug information like score in optionally.
-                body += screenName +': '+message+' ('+link+'):['+mmid+'] ['+str(score)+']\n'
-            body += "\n" # Separator for the next reply.
+                body += screenName + ': ' + message + ' (' + link + '):[' + mmid + '] [' + str(score) + ']\n'
+            body += "\n"  # Separator for the next reply.
         # Prepare the footer
         footer = ""
         # Assemble
         message = header + body + footer
+        message = 'Subject: {}\n\n{}'.format("HopeIn SJ Email", message)
+        # Remove all characters not ascii.
+        message = message.encode('ascii', errors='ignore')
         # Send mail
         smtp_host = self.conf['email']['smtp_host']
         smtp_port = int(self.conf['email']['smtp_port'])
         sender_email = self.conf['email']['sender_address']
         user_email = self.conf['email']['user_address']    
-        sender_username = None
-        if "sender_username" in self.conf['email'] and self.conf['email']['sender_username'] is not None:
-            sender_username = self.conf['email']['sender_username']
-        sender_password = None
-        if "sender_password" in self.conf['email'] and self.conf['email']['sender_password'] is not None:
-            sender_username = self.conf['email']['sender_password']
+        smtp_username = None
+        if 'smtp_username' in self.conf['email'] and self.conf['email']['smtp_username'] is not None:
+            smtp_username = self.conf['email']['smtp_username']
+        smtp_password = None
+        if 'smtp_password' in self.conf['email'] and self.conf['email']['smtp_password'] is not None:
+            smtp_password = self.conf['email']['smtp_password']
         context = ssl.create_default_context()
         with smtplib.SMTP(smtp_host, smtp_port) as server:
             server.ehlo()  # Can be omitted
             server.starttls(context=context)
             server.ehlo()  # Can be omitted
             # Only log on if username and password is presented.
-            if sender_username is not None and sender_password is not None:
-                server.login(sender_username, sender_password)
+            if smtp_username is not None and smtp_password is not None:
+                log.debug("Logging on with configured username: " + smtp_username + " and password.")
+                server.login(smtp_username, smtp_password)
             # Send the message
-            log.debug('Sending message to user email: '+str(user_email)+" Message is: "+str(message))
             try:
+                log.debug('Sending message from: '+str(sender_email)+' to user email: ' + str(user_email) + " Message is: " + str(message))
                 server.sendmail(sender_email, user_email, message)
             except Exception as e:
-                log.error('Failed to send message: '+str(e))
+                log.error('Failed to send message: ' + str(e))
                 return
             log.debug('Sent Successfully!')
     
@@ -253,12 +260,12 @@ class MailBot:
         # This requires title to be in the input query as that is the key in the dictionary.
         if 'title' not in query:
             # Also essential> Title is the unique ID of the query and used prominently in the e-mail
-            log.warning('Query doesn\'t have any "title" criteria. Skipping over parsing results for '+str(query))
+            log.warning('Query doesn\'t have any "title" criteria. Skipping over parsing results for ' + str(query))
             return
         # The hit limit needs to be there too, or use the default.
         hit_limit = 10
         if 'hit_limit' not in query:
-            log.debug('Unspecified hit limit in the query entitled: '+str(query['title'])+". Using default of 10.")
+            log.debug('Unspecified hit limit in the query entitled: ' + str(query['title']) + ". Using default of 10.")
         else:
             hit_limit = int(query['hit_limit'])
         # The author screen name should be there, or use Unidentified
@@ -275,19 +282,19 @@ class MailBot:
         # Ensure that we have found the replyToUse before going forward.
         if replyToUse is None:
             # Didn't find it?
-            log.warning('Did not find the reply for query title: '+query['title']+' in the globalReply. The class wasn\'t set up right. Skipping updateGlobalReply for this title.')
+            log.warning('Did not find the reply for query title: ' + query['title'] + ' in the globalReply. The class wasn\'t set up right. Skipping updateGlobalReply for this title.')
             return
         repliesList = replyToUse['replies']
         # Next, the score is needed to ascertain where it goes in the replyToUse's replies list (or if at all).
-        scoreOfRecord = ScoringHelper.scoreContent(record)
+        scoreOfRecord = self.scoringHelper.scoreContent(record)
         # Add the item at the end of the replies list.
-        preparedRecord = self.prepareRecord(record,scoreOfRecord)
+        preparedRecord = self.prepareRecord(record, scoreOfRecord)
         if preparedRecord is not None:
             repliesList += [preparedRecord]
         else:
             log.warning('The incoming match from Elastic Search was missing data. Skipping as part of the mail to the user.')
         # Sort the list based on the "score" contained.
-        sortedList = sorted(repliesList,key=self.sortReplies,reverse=True)
+        sortedList = sorted(repliesList, key=self.sortReplies, reverse=True)
         # Chop off the items at the end of the list if they exceed hit_limit.
         choppedList = sortedList[:hit_limit]
         # Put that choppedList back into the globalReply.
@@ -295,6 +302,7 @@ class MailBot:
         for reply in self.globalReply:
             if reply['title'] == query['title']:
                 reply['replies'] = choppedList
+
 
 def get_args():
     '''
@@ -328,6 +336,7 @@ def main():
     log.info('Sending mail')
     mb.sendMail()
     log.info("Sent. Done!")
+
 
 if __name__ == "__main__":
     '''

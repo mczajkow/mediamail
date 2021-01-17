@@ -94,7 +94,7 @@ class ElasticSearchHelper:
         # timeNow % totalCodes gives us a unique number for this 1/100th of 1 second.
         # this is unique for 916132832 1/100ths of a second or about 3.5 months.
         code = timeNow % totalCodes
-        code62 = base52.encode(code).zfill(5)
+        code62 = base62.encode(code).zfill(5)
         return code62
     
     def query(self, queryDict):
@@ -206,7 +206,7 @@ class ElasticSearchHelper:
         if url is not None:
             body['url'] = url
         # Generate a unique ID.
-        body['mmid'] = this.generateID()
+        body['mmid'] = self.generateID()
         # wait 0.01 to the next record, to ensure it would have a unique mmid.
         time.sleep(0.01)
         log.debug('Inserting into Elastic Search this body: ' + str(body))

@@ -3,7 +3,7 @@
 		"sender_address": "",
 		"smtp_password": "",
 		"smtp_port": 0,
-		"smtp_server": "",
+		"smtp_host": "",
 		"smtp_username": "",
 		"title": "",
 		"user_address": ""

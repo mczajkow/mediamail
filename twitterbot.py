@@ -221,8 +221,12 @@ class TwitterBot(StreamListener):
             sentiment = 'neutral'
         else:
             sentiment = 'positive'
+        # Now get the permalink URL
+        url = None
+        if 'id_str' in tweetData:
+            url = 'https://twitter.com/x/status/' + tweetData['id_str']
         log.debug('Inserting fully parsed Tweet into Elastic Search')
-        self.elasticSearchHelper.storeData(authorName, authorLocation, screenName, createdAt, hashtags, localityConfidence, location, placeName, placeFullName, textB.sentiment.polarity, references, 'twitter', sentiment, textB.sentiment.subjectivity, tweetText, tokens)
+        self.elasticSearchHelper.storeData(authorName, authorLocation, screenName, createdAt, hashtags, localityConfidence, location, placeName, placeFullName, textB.sentiment.polarity, references, 'twitter', sentiment, textB.sentiment.subjectivity, tweetText, tokens, url)
         log.debug('Elastic Search update complete.')
                                 
     def on_error(self, status):
