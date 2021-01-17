@@ -238,6 +238,7 @@ class MailBot:
                 log.debug('Sending message from: '+str(sender_email)+' to user email: ' + str(user_email) + " Message is: " + eml.as_string())
                 server.sendmail(eml['From'], { eml['To'], sender_email }, eml.as_string())
             except Exception as e:
+                # TODO: There seems to be error code 550 coming back that I can't send the emails. Should we retry?
                 log.error('Failed to send message: ' + str(e))
                 return
             log.debug('Sent Successfully!')
