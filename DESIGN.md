@@ -88,6 +88,21 @@ Contained within each `replies` dictionary are the following terms, all needed t
 * `link`: direct URL to the actual message
 * `author_screen_name` : the screen name of the author as per the media platform
 
+## Replybot
+Replybot's job is to check a mail server for emails. Once it receives that email, it verifies it is a reply to a Mailbot email and if so, it processes the replies.
+
+Replies are lines anywhere in the response email that start with a deli ticket number, the `mmid` that was assigned by the platform bot and stored in Elastic Search. For example:
+```
+00001 like
+```
+This would issue the command `like` in association with the ticket `00001`
+
+Possible commands are:
+* `like`: This issues the favorite or like to the author of the message.
+* `reply`: This sends a post back to the platform. The text following the word reply (after the space) is sent as-is. Some platforms have a limit on how much text you can reply with and some require that the author's name be included. Replybot will handle that, but keep in mind that if the response is too long nothing will happen other than a warning log message.
+
+
+
 ## Scoring
 Each message sent to the user via an email has an `integer` score associated with it. This is determined by several factors which are configured in Mailbot's mailbot.json (see above). 
 
