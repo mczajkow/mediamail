@@ -9,6 +9,7 @@ from utils import ConfigFileHelper, ElasticSearchHelper, ScoringHelper
 
 log = logging.getLogger(__name__)
 
+
 class MailBot:
     '''
     Mail bot acts on behalf of a particular user to search over the contents of the Elastic Search index, score messages, and deliver them to an email account.
@@ -50,7 +51,7 @@ class MailBot:
             log.error('No index configured in elastic section of configuration. Failing out.')
             return
         log.debug('Setting up Elastic Search...')
-        self.elasticSearchHelper = ElasticSearchHelper(self.conf['elastic']['host'], self.conf['elastic']['port'], self.conf['elastic']['index'])
+        self.elasticSearchHelper = ElasticSearchHelper(self.conf['elastic']['host'], self.conf['elastic']['port'], self.conf['elastic']['index'], self.conf)
         log.info('Elastic Search setup complete.')
         # Set up the Scoring Helper.
         self.scoringHelper = ScoringHelper(self.conf)
@@ -216,7 +217,7 @@ class MailBot:
         if 'smtp_password' in self.conf['email'] and self.conf['email']['smtp_password'] is not None:
             smtp_password = self.conf['email']['smtp_password']
         # Create the header MIMEText
-        eml = MIMEText(fullBody,_charset='UTF-8')
+        eml = MIMEText(fullBody, _charset='UTF-8')
         eml['Subject'] = 'Your Latest Social Media Search Results'
         eml['Message-ID'] = email.utils.make_msgid()
         eml['Date'] = email.utils.formatdate(localtime=1)
@@ -234,7 +235,7 @@ class MailBot:
                 server.login(smtp_username, smtp_password)
             # Send the message
             try:
-                log.debug('Sending message from: '+str(sender_email)+' to user email: ' + str(user_email) + " Message is: " + eml.as_string())
+                log.debug('Sending message from: ' + str(sender_email) + ' to user email: ' + str(user_email) + " Message is: " + eml.as_string())
                 server.sendmail(eml['From'], { eml['To'], sender_email }, eml.as_string())
             except Exception as e:
                 # TODO #15-Mailbot-to-Handle-SMTP-Errors: There seems to be error code 550 coming back that I can't send the emails. Should we retry?

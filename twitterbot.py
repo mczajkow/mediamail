@@ -50,7 +50,7 @@ class TwitterBot(StreamListener):
             log.error('No index configured in elastic section of configuration. Failing out.')
             return
         log.debug('Setting up Elastic Search...')
-        self.elasticSearchHelper = ElasticSearchHelper(self.conf['elastic']['host'], self.conf['elastic']['port'], self.conf['elastic']['index'])
+        self.elasticSearchHelper = ElasticSearchHelper(self.conf['elastic']['host'], self.conf['elastic']['port'], self.conf['elastic']['index'], self.conf)
         log.info('Elastic Search setup complete.')
         # Twitter: Set twitter keys/tokens. Check to see they are set first.
         if 'twitter' not in self.conf:

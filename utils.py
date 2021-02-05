@@ -1,12 +1,11 @@
 import base62
 import logging
 import json
+import tweepy
 import time
 from elasticsearch import Elasticsearch
-from importlib.metadata import EntryPoint
 
 log = logging.getLogger(__name__)
-
 
 class ConfigFileHelper:
     '''
@@ -61,13 +60,15 @@ class ElasticSearchHelper:
     @author: Michael
     '''
 
-    def __init__(self, elasticSearchHost, elasticSearchPort, elasticSearchIndex):
+    def __init__(self, elasticSearchHost, elasticSearchPort, elasticSearchIndex, conf):
         '''
         Initializes the ElasticSearchhelper class instance
         
         -- elasticSearchHost string, the host name where to find Elastic Search. Required, if not given, an error will be issued and the class will not set up a connection.
         -- elasticSearchPort integer, the port to connect to Elastic Search with. Required, if not given, an error will be issued and the class will not set up a connection.
         -- elasticSearchIndex string, the name of the index to send data and queries to. Required, if not given, an error will be issued and the class will not set up a connection.
+        -- conf dictionary, the configuration of the bot, as loaded in the ConfigFileHelper.
+        @see ConfigFileHelper
         '''
         if elasticSearchHost is None:
             log.error('Could not initialize Elastic Search with a None host name given.')
@@ -83,23 +84,59 @@ class ElasticSearchHelper:
         except Exception as e:
             log.error('Failed to initialize connection to Elastic Search: ' + str(e))
         self.elasticSearchIndex = elasticSearchIndex
-        
-    def generateID(self):
+        # This class also needs access to an instance of MMIDHelper.
+        self.mmidHelper = MMIDHelper(conf)
+             
+    def parseQueryResults(self, queryResults, mmid=None):
         '''
-        Media Mail needs an ID associated with each record to be put into the Elastic Search record store. This is for easy lookup later. IDs are 5 alpha-numeric characters based on wall time.
+        The contents of a query in Elastic Search have a lot of extra Elastic Search metadata in them. This method will pull out the record(s) stored as-is and return them in a list.
         
-         @return string, 5 characters long [A-Za-z0-9] unique to the 1/100th of a second.
+        -- queryResults dictionary, the results of the query containing the elastic search metadata. Required to not be None.
+        -- mmid string, by specifying an mmid an exact match will be checked on the records prior to returning them. Only matches with this mmid will be returned.
+        @return a list of dictionary, these are the original record formats put in via storeData, @see storeData
         '''
-        # The code generated is based on the hundreths of second past epoch
-        timeNow = int(time.time()*100)
-        # We use a reference number (62^5-1) to generate five 62-digit characters
-        totalCodes = (62*62*62*62*62)-1
-        # timeNow % totalCodes gives us a unique number for this 1/100th of 1 second.
-        # this is unique for 916132832 1/100ths of a second or about 3.5 months.
-        code = timeNow % totalCodes
-        code62 = base62.encode(code).zfill(5)
-        return code62
-    
+        workingResultsReturned = []
+        if queryResults is None or isinstance(queryResults, dict) is False:
+            log.debug('Input queryResults is None or not a dictionary. Returning an empty list.')
+            return workingResultsReturned
+        # Content is in { "hits" : { "hits" : [ { "_source" : {HERE} } ... ] } }
+        if 'hits' not in queryResults or isinstance(queryResults['hits'], dict) is False:
+            log.debug('Unrecognizes query results, expecting hits to be in top level: ' + str(queryResults))
+            return workingResultsReturned
+        innerHits = queryResults['hits']
+        if 'hits' not in innerHits or isinstance(innerHits['hits'], list) is False:
+            log.debug('Unrecognizes query results, expecting hits to be in {"hits":{}}: ' + str(queryResults))
+            return workingResultsReturned
+        # Each item in the results also needs to be cleaned up.
+        for esRecord in innerHits['hits']:
+            if isinstance(esRecord, dict) is False:
+                log.debug('Inner hits are not dictionaries, skipping.')
+                continue
+            if '_source' not in esRecord:
+                log.debug('The field _source is not specified in the list item of an inner hit. Skipping')
+                continue
+            source = esRecord['_source']
+            # This should be a dictionary.
+            if isinstance(source, dict) is False:
+                log.debug('The _source of an Elastic Search hit is not a dictionary? skipping.')
+                continue
+            workingResultsReturned += [source]
+        # Additional checks.
+        resultsReturned = []
+        for result in workingResultsReturned:
+            # TODO 20-Create-Elastic-Search-Indecies-with-Mappings: If this is done, a mapping can be made to eliminate the need to do extra work here for mmid matchin as that can be put into the query.
+            if mmid is not None and 'mmid' in result:
+                # Check match
+                if result['mmid'] == mmid:
+                    resultsReturned += [result]  # Match found.
+                else:
+                    # Skip, we don't want this one.
+                    continue
+            # If there are no additional filters to try out, keep it.
+            resultsReturned += [result]
+        # Return results.
+        return resultsReturned
+            
     def query(self, queryDict):
         '''
         Queries Elastic Search with a single query and returns the results of the query.
@@ -167,7 +204,7 @@ class ElasticSearchHelper:
                 return
             body['locality_confidence'] = lC
         else:
-            body['locality_confidence'] = 0.0 # Default is zero.
+            body['locality_confidence'] = 0.0  # Default is zero.
         if placeName is not None:
             body['place_name'] = placeName
         if placeFullName is not None:
@@ -209,7 +246,8 @@ class ElasticSearchHelper:
         if url is not None:
             body['url'] = url
         # Generate a unique ID.
-        body['mmid'] = self.generateID()
+        # TODO: This next line seems like it should not be in this class. It makes a cleaner design to pass this in. It makes ElasticSearchHelper no longer need a MMIDHelper and the oddity of the constructor requiring the entire configuration after only requiring a sub-set. Remove this here and put it in the calling class.
+        body['mmid'] = self.mmidHelper.generateID()
         # wait 0.01 to the next record, to ensure it would have a unique mmid.
         time.sleep(0.01)
         log.debug('Inserting into Elastic Search this body: ' + str(body))
@@ -267,10 +305,73 @@ class ElasticSearchHelper:
         returnedList = []
         for item in strippedList:
             if isinstance(item, dict) is False:
-                continue # This one is not a dictionary, and should be.
+                continue  # This one is not a dictionary, and should be.
             if '_source' in item and isinstance(item['_source'], dict):
                 returnedList += [item['_source']]
         return returnedList
+
+
+class MMIDHelper:
+    '''
+    MMIDHelper provides functions to generate, check, and manage MMIDs (media mail IDs)
+    @author: Michael
+    '''
+    
+    def __init__(self, config):
+        '''
+        Sets up the MMIDHelper using the configuration loaded from a file
+        
+        -- config dictionary, the loaded properties from the configuration files for the bot. Required, if None then an error is logged and nothing happens.
+        @see ConfigFileHelper
+        '''
+        if config is None:
+            log.error('Failed to initialize MMIDHelper as provided config dictionary is None. MMIDHelper is not set up properly.')
+            return
+        self.conf = config
+    
+    def generateID(self):
+        '''
+        Media Mail needs an ID associated with each record to be put into the Elastic Search record store and used later for looking up records. IDs are 5 alpha-numeric characters based on wall time.
+        
+         @return string, 5 characters long [A-Za-z0-9] unique to the 1/100th of a second.
+        '''
+        # The code generated is based on the hundreths of second past epoch
+        timeNow = int(time.time() * 100)
+        # We use a reference number (62^5-1) to generate five 62-digit characters
+        totalCodes = (62 * 62 * 62 * 62 * 62) - 1
+        # timeNow % totalCodes gives us a unique number for this 1/100th of 1 second.
+        # this is unique for 916132832 1/100ths of a second or about 3.5 months.
+        code = timeNow % totalCodes
+        code62 = base62.encode(code).zfill(5)
+        return code62
+    
+    def isBlacklisted(self, mmid):
+        '''
+        The configuration of Media Mail allows for a black list of MMIDs, special cases which should not be used. This function checks that list for the given MMID.
+        
+        -- mmid string, 5 characters long [A-Za-z0-9]. If None is given, False will be returned and an error reported on the DEBUG log.
+        @return boolean, True if on the blacklist, False otherwise
+        '''
+        if mmid is None:
+            log.debug('Can not check blacklist of tokens if given a None MMID. False returned')
+            return False
+        if 'tokens' not in self.conf:
+            # No token configuration. Can't check blacklist.
+            log.debug('Could not check blacklist as no token section in configuration is set up.')
+            return False
+        if 'blacklist' not in self.conf['tokens']:
+            # No blacklist configuration. Can't check blacklist.
+            log.debug('Could not check blacklist as no blacklist section in the tokens in the configuration was set up.')
+            return False
+        if isinstance(self.conf['tokens']['blacklist'], list):
+            # Now check contents.
+            if mmid in self.conf['tokens']['blacklist']:
+                return True
+        else:
+            log.debug('The configuration of the blacklist tokens in the configuration is not a list. Any check for blacklist tokens will be False.')
+        # All other cases, just return False.
+        return False
+
 
 class TwitterHelper:
     '''
@@ -289,6 +390,44 @@ class TwitterHelper:
             log.error('Failed to initialize TwitterHelper as provided config dictionary is None. TwitterHelper is not set up properly.')
             return
         self.conf = config
+         # Now look up the consumer_key, consumer_secret, access_token, access_token_secret in config.
+        if 'twitter' not in self.conf:
+            log.error('No twitter section in configuration. Failing out.')
+            return
+        if 'consumer_key' not in self.conf['twitter'] or len(str(self.conf['twitter']['consumer_key'])) == 0:
+            log.error('Failed to initialize access to twitter. Consumer key provided in configuration is: ' + str(self.conf['twitter']['consumer_key']))
+            return
+        if 'consumer_secret' not in self.conf['twitter'] or len(str(self.conf['twitter']['consumer_secret'])) == 0:
+            log.error('Failed to initialize access to twitter. Consumer secret provided in configuration is: ' + str(self.conf['twitter']['consumer_secret']))
+            return
+        if 'access_token' not in self.conf['twitter'] or len(str(self.conf['twitter']['access_token'])) == 0:
+            log.error('Failed to initialize access to twitter. Access token provided in configuration is: ' + str(self.conf['twitter']['access_token']))
+            return
+        if 'access_token_secret' not in self.conf['twitter'] or len(str(self.conf['twitter']['access_token_secret'])) == 0:
+            log.error('Failed to initialize access to twitter. Access token secret provided in configuration is: ' + str(self.conf['twitter']['access_token_secret']))
+            return
+        # Set up an OAuthHandler for the helper class to use.
+        self.auth = OAuthHandler(self.conf['twitter']['consumer_key'], self.conf['twitter']['consumer_secret'])
+        self.auth.set_access_token(self.conf['twitter']['access_token'], self.conf['twitter']['access_token_secret'])
+    
+    def favorite(self, idoftweet):
+        '''
+        This methond will take the tweet ID and then favorite it.
+        
+        -- idoftweet string or integer, representing the tweet's ID. If None is given, nothing happens other than a warning log.
+        '''
+        if idoftweet is None:
+            log.warning('The ID of the tweet to favorite was None. Ignoring.')
+            return
+        # Make API call
+        api = tweepy.API(self.auth)
+        reply = ""
+        log.debug("Liking this tweet: " + str(idoftweet))
+        try:
+            reply = api.create_favorite(id=int(idoftweet))
+            log.debug("Tweet liked")
+        except Exception as e:
+            log.warning("Error in liking the tweet: " + str(e) + " with reply: " + str(reply))
         
     def getTweetText(self, tweetData):
         '''
@@ -399,7 +538,36 @@ class TwitterHelper:
         # No more places it could be...                           
         return False
 
+    def reply(self, idoftweet, prose, tweetOwner):
+        '''
+        This method takes a tweet ID, prose, and the original tweetOwner and issues a status_update (Tweet) to reply to the original owner by prepending their name to the prose, e.g. @tweetOwner
+        
+        -- idoftweet a string or integer, representing the tweet's ID. If None or empty is given then nothing happens other than a warning log.
+        -- prose the message, must be less than 281 characters sans the name of the tweetOwner, will be rejected if not. Required. If None or empty is given, nothing happens other than a warning log.
+        -- tweetOwner the screen name of the owner, without the @. Required. If None or empty is given, nothing happens other than a warning log.
+        '''
+        if idoftweet is None or len(idoftweet) == 0:
+            log.warn('Could not reply to the tweet ID given as it was None or empty')
+            return
+        if prose is None or len(prose) == 0:
+            log.warn('Could not reply to the tweet ID given as the prose was None or empty')
+            return
+        if tweetOwner is None or len(tweetOwner) == 0:
+            log.warn('Could not reply to the tweet ID given as the tweetOwner was None or empty')
+            return
+        # Make API call
+        api = tweepy.API(self.auth)        
+        assembledMessage = '@' + tweetOwner + ' ' + prose
+        # TODO: Check length of message before sending. Reply if error and then allow the calling method to process that error
+        reply = ''
+        log.debug('Replying to this tweet: ' + str(idoftweet) + ' with tweet: ' + assembledMessage)
+        try:
+            reply = api.update_status(assembledMessage, in_reply_to_status_id=int(idoftweet))
+            log.debug('Tweet sent!')
+        except Exception as e:
+            log.warning('Error in replying to the tweet: ' + str(e) + ' with reply: ' + str(reply))
 
+            
 class ScoringHelper:
     '''
     This class is used to help score data found in Elastic Search according to user preferences found in the configuration.    
@@ -441,7 +609,7 @@ class ScoringHelper:
         if 'scoring' not in self.conf:
             log.warning('There is no scoring section in the configuration. Returning 0.')
             return 0
-        score = 0 # start off at zero
+        score = 0  # start off at zero
         # LENGTH - score points based on how many tokens arein the record.
         if 'points_per_word' in self.conf['scoring']:
             ppw = 0
@@ -449,7 +617,7 @@ class ScoringHelper:
                 ppw = int(self.conf['scoring']['points_per_word'])
             except Exception as e:
                 # Not an integer?
-                log.debug('Could not utilize points_per_word in the scoring section of the configuration: '+str(e))
+                log.debug('Could not utilize points_per_word in the scoring section of the configuration: ' + str(e))
             if 'text' in record:
                 score += (len(record['text'].split(' ')) * ppw)
             else:
@@ -463,7 +631,7 @@ class ScoringHelper:
                 lm = int(self.conf['scoring']['locality_multiplier'])
             except Exception as e:
                 # Not an integer?
-                log.debug('Could not utilize locality_multiplier in the scoring section of the configuration: '+str(e))
+                log.debug('Could not utilize locality_multiplier in the scoring section of the configuration: ' + str(e))
             if 'locality_confidence' in record:
                 score += float(lm) * record['locality_confidence']
         # TODO #7-Redesign-Follower-Scoring: Twitterchat had this capability but Mediamail has to implement this differently. It would need to be the follower of the user who gets the e-mail.
@@ -479,9 +647,9 @@ class ScoringHelper:
                     try:
                         points = int(self.conf['scoring']['interested_words'][keyword])
                     except Exception as e:
-                        log.debug('Keyword of interest has a non-integer value for word: '+str(keyword))
+                        log.debug('Keyword of interest has a non-integer value for word: ' + str(keyword))
                     if 'text' in record and keyword.lower() in record['text'].lower():
-                        log.debug('Found a matching keyword: '+str(keyword)+' within the record.')
+                        log.debug('Found a matching keyword: ' + str(keyword) + ' within the record.')
                         score = score + points
         # KEYWORDS of DISINTEREST
         if 'disinterested_words' in self.conf['scoring']:
@@ -495,9 +663,9 @@ class ScoringHelper:
                     try:
                         points = int(self.conf['scoring']['disinterested_words'][keyword])
                     except Exception as e:
-                        log.debug('Keyword of disinterest has a non-integer value for word: '+str(keyword))
+                        log.debug('Keyword of disinterest has a non-integer value for word: ' + str(keyword))
                     if 'text' in record and keyword.lower() in record['text'].lower():
-                        log.debug('Found a matching keyword: '+str(keyword)+' within the record.')
+                        log.debug('Found a matching keyword: ' + str(keyword) + ' within the record.')
                         score = score - points
         # TODO #17-Eliminate-Interest-and-Disinterest-Word-Scoring: Having a distinction between these two (interest and disinterest) makes no sense. Rather just a global keyword scoring allowing any positive or negative number makes better sense.
         # TODO #9-Implement Derivative Message Scoring: Re-work the index to store a flag for derived messages like re-tweets and then score them separately.
@@ -536,5 +704,5 @@ class ScoringHelper:
                         if handle.lower() in reference.lower():
                             # Match. The references contain @ whereas the handles do not have to.
                             score += rtm
-        log.debug('Assigning score value of: '+str(score)+' to the record')
+        log.debug('Assigning score value of: ' + str(score) + ' to the record')
         return score

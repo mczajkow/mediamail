@@ -1,11 +1,13 @@
 {
-	"elastic" : {
-		"host" : "",
-		"index" : "",
-		"port" : 2900
+	"elastic": {
+		"host": "",
+		"index": "",
+		"port": 2900
 	},
-	"user_identification" : {
-		"social_media_handles" : []
+	"tokens": {
+		"blacklist": []
+	},
+	"user_identification": {
+		"social_media_handles": []
 	}
 }
-	
