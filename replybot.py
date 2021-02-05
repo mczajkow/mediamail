@@ -9,6 +9,7 @@ from utils import ConfigFileHelper, ElasticSearchHelper
 
 log = logging.getLogger(__name__)
 
+
 class ReplyBot:
     '''
     Reply bot periodically checks an email account for response e-mails from a user. When this happens, it will find the corresponding media to reply to and issue the response.
@@ -62,48 +63,63 @@ class ReplyBot:
         self.elasticSearchHelper = ElasticSearchHelper(self.conf['elastic']['host'], self.conf['elastic']['port'], self.conf['elastic']['index'])
         log.info('Elastic Search setup complete.')
     
-    def processMessage(self, message):
+    def processMessage(self, deliToken, messageBody):
         '''
-        Takes in an array of bytes of strings that comprise the raw body of the email message. It assembles the email body and then looks for deli tokens in there. If any are found, processDeliToken is then called.
+        Takes in a deliToken and the contents of the body of the message preceding the deliToken, just after the closing ] mark. Processes the contained command (if any).
+
+        -- deliToken string, 5 characters in length. Required. Without this, nothing is processed and a warning issued.
+        -- messageBody string, the contents of the command message to give to the referenced deliToken.
+        '''
+        continue
+    
+    def processEmail(self, message):
+        '''
+        Takes in an array of bytes of strings that comprise the raw body of the email message. It assembles the email body and then looks for deli tokens in there. If any are found, processMessage is then called.
         
         -- message array of bytes, each byte is convertable into a string. Required, if None is passed, a warning is issued and nothing happens.
         @see processDeliToken
         '''
-        if message is None or isinstance(message,list) is False:
+        if message is None or isinstance(message, list) is False:
             log.warning(msg)('No message passed in, doing nothing with the email.')
             return
         # Parse out the garbage in each line.
         cleanedMessage = ""
         for line in message:
             cleanedLine = ""
+            # Lines begin with b' or b"
             cleanedLineParts1 = str(line).split("b'")
             cleanedLineParts2 = str(line).split('b"')
             if len(cleanedLineParts1) > 1:
                 # Most cases are here.
                 cleanedLine = cleanedLineParts1[1]
-                cleanedLine = cleanedLine[:len(cleanedLine)-1]            
+                cleanedLine = cleanedLine[:len(cleanedLine) - 1]            
             elif len(cleanedLineParts1) == 1 and len(cleanedLineParts2) > 1:
                 # The alternate, starts with b" is then used.
                 cleanedLine = cleanedLineParts2[1]
-                cleanedLine = cleanedLine[:len(cleanedLine)-1]                
+                cleanedLine = cleanedLine[:len(cleanedLine) - 1]
             # else: If anything else, just skip that line.
             cleanedMessage += cleanedLine
         # Now, the result of this is to have a glob of text that needs parsing for the [ and ] of the deli token.
-        parse1 = cleanedMessage.split('[')
-        for part1 in parse1:
-            if len(part1) > 6:
+        parsed = cleanedMessage.split('[')
+        for part in parsed:
+            if len(part) > 6:
                 # OK, it could be a deli token. Check for ending.
-                if part1[5] == ']':
+                if part[5] == ']':
                     # Good, now pull out the contents and do a deli token check.
-                    log.debug('Found potential deli token: '+str(part1))
-                    continue
+                    token = part[:5]
+                    log.debug('Found potential deli token: ' + token)
+                    # Special case check: 'class' is not a valid token.
+                    if token == "class":  # add more as needed.
+                        log.debug('Skipping special case token')
+                        continue
+                    # Now process the entire part1 as it now may contain additional information.
+                    processMessage(token, part.split(']')[1])
                 else:
                     # Not a deli token, the 6th character is not a ] closer. Ignore.
                     continue
             else:
                 # Doesn't have at least 6 characters afterwards. Ignore
                 continue
-                                
     
     def readMail(self):
         '''
@@ -116,7 +132,7 @@ class ReplyBot:
         try:
             server = poplib.POP3(self.conf['email']['server'])
         except Exception as e:
-            log.error('Failed to connect to sever via POP3. No mail downloaded or read.',e)
+            log.error('Failed to connect to sever via POP3. No mail downloaded or read.', e)
             return
         # Login
         log.debug('Logging on to server...')
@@ -124,7 +140,7 @@ class ReplyBot:
             server.user(self.conf['email']['username'])
             server.pass_(self.conf['email']['password'])
         except Exception as e:
-            log.error('Failed to log in with supplied username and password in configuration. No mail downloaded or read.',e)
+            log.error('Failed to log in with supplied username and password in configuration. No mail downloaded or read.', e)
             return
         # List items on server
         resp = None
@@ -134,16 +150,17 @@ class ReplyBot:
         try:
             resp, items, octets = server.list()
         except Exception as e:
-            log.error('Failed to list items on the server. No mail downloaded or read.',e)
+            log.error('Failed to list items on the server. No mail downloaded or read.', e)
             return
-        log.debug('Response is: '+str(resp)+' items are: '+str(items)+' octets are: '+str(octets))
+        log.debug('Response is: ' + str(resp) + ' items are: ' + str(items) + ' octets are: ' + str(octets))
         # Now actually pull them down, one at a time
-        for i in range(0,1):
+        for i in range(0, 1):
             log.debug('Pulling down an item...')
             id, size = str(items[i]).split("'")[1].split(' ')
-            log.debug('ID is: '+str(id) + ' and size is: '+str(size))
+            log.debug('ID is: ' + str(id) + ' and size is: ' + str(size))
             resp, text, octets = server.retr(id)
-            self.processMessage(text)
+            self.processEmail(text)
+
 
 def get_args():
     '''
@@ -173,6 +190,7 @@ def main():
     rb = ReplyBot(options.config_file)
     # TODO: More actions here
     rb.readMail()
+
 
 if __name__ == "__main__":
     '''
