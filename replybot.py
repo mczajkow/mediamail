@@ -317,13 +317,23 @@ class ReplyBot:
             log.error('Failed to list items on the server. No mail downloaded or read.', e)
             return
         log.debug('Response is: ' + str(resp) + ' items are: ' + str(items) + ' octets are: ' + str(octets))
-        # Now actually pull them down, one at a time
-        for i in range(0, 1):
-            log.debug('Pulling down an item...')
-            id, size = str(items[i]).split("'")[1].split(' ')
+        if len(items) == 0:
+            # No mail!
+            log.info('No mail to process. Try again later!')
+            return
+        for item in items:
+            log.debug('Pulling down item id: ' + str(item))
+            id, size = str(item).split("'")[1].split(' ')
             log.debug('ID is: ' + str(id) + ' and size is: ' + str(size))
             resp, text, octets = server.retr(id)
+            log.info('Processing email with id: ' + str(id))
             self.processEmail(text)
+            log.debug('Deleting the email with id: ' + str(id))
+            deleteResponse = server.dele(id)
+        # And now we're done, call quit.
+        log.debug('Finishing up by calling quit on the server.')
+        server.quit()
+        log.info('Processed mail.')
 
 
 def get_args():
