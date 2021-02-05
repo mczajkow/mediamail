@@ -167,7 +167,7 @@ class ReplyBot:
                 self.myTwitterHelper.favorite(tweetId)
             except Exception as e:
                 # Some problem in splitting up the url?
-                log.warning('Could not get the tweetId from the url: ' + str(url) + '. Ignoring.')
+                log.warning('Could not get the tweetId from the url: ' + str(result['url']) + '. Ignoring.')
         else:
             # Unsupported platform.
             log.warning('Record for MMID: ' + mmid + ' has an unsupported source: ' + source + ". Ignoring.")
@@ -266,7 +266,7 @@ class ReplyBot:
                 tweetId = result['url'].split('/')[len(result['url'].split('/')) - 1]
             except Exception as e:
                 # Some problem in splitting up the url?
-                log.warning('Could not get the tweetId from the url: ' + str(url) + '. Ignoring.')
+                log.warning('Could not get the tweetId from the url: ' + str(result['url']) + '. Ignoring.')
                 return 
             # Now get the author. For Twitter, it is required that the next word after the MMID is a shout-out, e.g. @johndoe
             author = ''

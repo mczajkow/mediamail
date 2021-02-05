@@ -4,6 +4,7 @@ import json
 import tweepy
 import time
 from elasticsearch import Elasticsearch
+from tweepy import OAuthHandler
 
 log = logging.getLogger(__name__)
 
@@ -407,8 +408,10 @@ class TwitterHelper:
             log.error('Failed to initialize access to twitter. Access token secret provided in configuration is: ' + str(self.conf['twitter']['access_token_secret']))
             return
         # Set up an OAuthHandler for the helper class to use.
+        log.debug('Setting up the self auth OAuthHandler for the helper class.')
         self.auth = OAuthHandler(self.conf['twitter']['consumer_key'], self.conf['twitter']['consumer_secret'])
         self.auth.set_access_token(self.conf['twitter']['access_token'], self.conf['twitter']['access_token_secret'])
+        log.debug('Done!')
     
     def favorite(self, idoftweet):
         '''
@@ -416,10 +419,12 @@ class TwitterHelper:
         
         -- idoftweet string or integer, representing the tweet's ID. If None is given, nothing happens other than a warning log.
         '''
+        log.debug('Attempting to like a tweet.')
         if idoftweet is None:
             log.warning('The ID of the tweet to favorite was None. Ignoring.')
             return
         # Make API call
+        log.debug('Setting up API for the call')
         api = tweepy.API(self.auth)
         reply = ""
         log.debug("Liking this tweet: " + str(idoftweet))
