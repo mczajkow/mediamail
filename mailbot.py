@@ -103,17 +103,17 @@ class MailBot:
             # Elastic search will not want any of that, it just wants a dictionary with one term: "query"
             queryDict = { "query": query["query"] }
             log.debug('Query to Elastic Search is: ' + str(queryDict))
-            result = self.elasticSearchHelper.query(queryDict)
-            log.debug('Result: ' + str(result))
-            # TODO #13-Page-Results-From-Elastic-Search: seems to be only bringing in small quantities. Paging?
-            # Stip the results that come back using the helper function in ElasticSearchHelper. Turns results into an array.
-            strippedResult = self.elasticSearchHelper.stripResults(result)
-            if len(strippedResult) == 0:
-                # No results?
-                log.debug('No results found when stripping the data from Elastic Search')
-                continue
-            # Now update the global reply record on each reply.
-            for reply in strippedResult:
+            # Issue a scan, as we want to get all records to process.
+            scanner = self.elasticSearchHelper.scan(queryDict)
+            for scannedResult in scanner:
+                # log.debug('Result: ' + str(aResult))
+                # Each result is actually contained in the inside "_source" field.
+                if isinstance(scannedResult, dict) is False or '_source' not in scannedResult:
+                    # Not what we're expecting.
+                    log.debug('Failed to process result, no _source found in the result from query!')
+                    continue
+                reply = scannedResult['_source']
+                # Now update the global reply for this query.
                 self.updateGlobalReply(reply, query)
 
     def prepareRecord(self, record, score=0):

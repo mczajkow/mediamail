@@ -1,4 +1,5 @@
 import base62
+import elasticsearch.helpers
 import logging
 import json
 import tweepy
@@ -7,6 +8,7 @@ from elasticsearch import Elasticsearch
 from tweepy import OAuthHandler
 
 log = logging.getLogger(__name__)
+
 
 class ConfigFileHelper:
     '''
@@ -143,13 +145,28 @@ class ElasticSearchHelper:
         Queries Elastic Search with a single query and returns the results of the query.
         
         -- queryDict dictionary. Elastic Search uses dictionaries with "query" in them to return results. Required. Without this being set, a WARNING log is issued and nothing happens.
-        @return dictionary containing a list of results all in JSON string format.
+        @return dictionary result of issuing the query
         '''
         if queryDict is None:
             log.warning('Could not query Elastic Search with None query dictionary.')
             return
         try:
-            return self.elasticSearch.search(index=self.elasticSearchIndex, body=queryDict)
+           return self.elasticSearch.search(index=self.elasticSearchIndex, body=queryDict)
+        except Exception as e:
+            log.error('Failed query to Elastic Search for this query: ' + str(queryDict) + " Error is: " + str(e))
+        
+    def scan(self, queryDict):
+        '''
+        Queries Elastic Search with a single query and returns the results of the query.
+        
+        -- queryDict dictionary. Elastic Search uses dictionaries with "query" in them to return results. Required. Without this being set, a WARNING log is issued and nothing happens.
+        @return iterator this can be used to scan over a list of results all in JSON string format.
+        '''
+        if queryDict is None:
+            log.warning('Could not query Elastic Search with None query dictionary.')
+            return
+        try:
+            return elasticsearch.helpers.scan(self.elasticSearch, index=self.elasticSearchIndex, query=queryDict)
         except Exception as e:
             log.error('Failed query to Elastic Search for this query: ' + str(queryDict) + " Error is: " + str(e))
         
@@ -259,57 +276,6 @@ class ElasticSearchHelper:
         except Exception as e:
             log.error("Could not index in Elastic Search: " + str(e))
 
-    def stripResults(self, response):
-        '''
-        Elastic Search puts a lot of extra wrapping around replies that isn't useful to processing results directly.
-
-        The content of the response passed in should be structured as follows (not everything shown):
-        { "hits" :
-         { "hits" :
-           [ 
-            {
-             "_source" : {}
-            },
-            {
-             "_source" : {}
-            },
-            ...
-          ]
-         }
-        }
-        This method will return just the _source dictionarys in an array.
-        
-        -- response dictionary, is the retuned response from Elastic Search that contains the content being stripped. Required, if none or not formatted as described in the description then an empty list is returned and a warning issued.
-        @return list, see description. It contains only the _source contents of the Elastic Search result.
-        '''
-        if response is None:
-            log.warning('None was passed into stripResults. Empty list being returned.')
-            return []
-        if isinstance(response, dict) is False:
-            log.warning('A non dictionary was passed into stripResults. Empty list being returned.')
-            return []
-        if 'hits' not in response:
-            log.warning('Hits not found in the dictionary passed in. Empty list being returned.')
-            return []
-        hits1 = response['hits']
-        if isinstance(hits1, dict) is False:
-            log.warning('A non dictionary was found under hits of the response passed in. Empty list being returned.')
-            return []
-        if 'hits' not in hits1:
-            log.warning('Hits[Hits] not found in the dictionary passed in. Empty list being returned.')
-            return []
-        strippedList = hits1['hits']
-        if isinstance(strippedList, list) is False:
-            log.warning('Hits[Hits] found in the dictionary passed in, but it isn\'t a list. Empty list being returned.')
-            return []
-        # Now go through strippedList and then pull out each item and its "_source" content.
-        returnedList = []
-        for item in strippedList:
-            if isinstance(item, dict) is False:
-                continue  # This one is not a dictionary, and should be.
-            if '_source' in item and isinstance(item['_source'], dict):
-                returnedList += [item['_source']]
-        return returnedList
 
 
 class MMIDHelper:
@@ -565,7 +531,7 @@ class TwitterHelper:
         assembledMessage = '@' + tweetOwner + ' ' + prose
         # Tweets can not be more than 280 characters. Check and if that exceeds, print out a WARN.
         if len(assembledMessage) > 280:
-            log.warn('Tweet reply exceeds length of 280 characters. Ignoring this reply: '+assembledMessage)
+            log.warn('Tweet reply exceeds length of 280 characters. Ignoring this reply: ' + assembledMessage)
             return
         reply = ''
         log.debug('Replying to this tweet: ' + str(idoftweet) + ' with tweet: ' + assembledMessage)
