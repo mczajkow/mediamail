@@ -287,7 +287,7 @@ class ReplyBot:
     
     def readMail(self):
         '''
-        Connects to the configured email server, downloads mail and then utilizes the processMessage method per message.
+        Connects to the configured email server, downloads mail and then utilizes the processMessage method per message. Deletes mail it processes.
         
         @see processMessage
         '''
@@ -362,7 +362,6 @@ def main():
     options = get_args()
     jaraco.logging.setup(options)
     rb = ReplyBot(options.config_file)
-    # TODO: More actions here
     rb.readMail()
 
 

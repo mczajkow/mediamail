@@ -125,7 +125,7 @@ class ElasticSearchHelper:
         # Additional checks.
         resultsReturned = []
         for result in workingResultsReturned:
-            # TODO 20-Create-Elastic-Search-Indecies-with-Mappings: If this is done, a mapping can be made to eliminate the need to do extra work here for mmid matchin as that can be put into the query.
+            # TODO #20-Create-Elastic-Search-Indecies-with-Mappings: If this is done, a mapping can be made to eliminate the need to do extra work here for mmid matchin as that can be put into the query.
             if mmid is not None and 'mmid' in result:
                 # Check match
                 if result['mmid'] == mmid:
@@ -247,7 +247,7 @@ class ElasticSearchHelper:
         if url is not None:
             body['url'] = url
         # Generate a unique ID.
-        # TODO: This next line seems like it should not be in this class. It makes a cleaner design to pass this in. It makes ElasticSearchHelper no longer need a MMIDHelper and the oddity of the constructor requiring the entire configuration after only requiring a sub-set. Remove this here and put it in the calling class.
+        # TODO #21-Move-MMID-Generation-out-of-ElasticSearchHelper: This next line seems like it should not be in this class. It makes a cleaner design to pass this in. It makes ElasticSearchHelper no longer need a MMIDHelper and the oddity of the constructor requiring the entire configuration after only requiring a sub-set. Remove this here and put it in the calling class.
         body['mmid'] = self.mmidHelper.generateID()
         # wait 0.01 to the next record, to ensure it would have a unique mmid.
         time.sleep(0.01)
@@ -563,7 +563,10 @@ class TwitterHelper:
         # Make API call
         api = tweepy.API(self.auth)        
         assembledMessage = '@' + tweetOwner + ' ' + prose
-        # TODO: Check length of message before sending. Reply if error and then allow the calling method to process that error
+        # Tweets can not be more than 280 characters. Check and if that exceeds, print out a WARN.
+        if len(assembledMessage) > 280:
+            log.warn('Tweet reply exceeds length of 280 characters. Ignoring this reply: '+assembledMessage)
+            return
         reply = ''
         log.debug('Replying to this tweet: ' + str(idoftweet) + ' with tweet: ' + assembledMessage)
         try:
@@ -628,7 +631,7 @@ class ScoringHelper:
             else:
                 log.debug('Data record from Elastic Search had no text in it. No length based scoring was done.')
         # LOCALITY
-        # TODO 6-Move-Locality-to-Mailbot. This should not come directly from the record but rather be determined here in this method with the record data.
+        # TODO #6-Move-Locality-to-Mailbot. This should not come directly from the record but rather be determined here in this method with the record data.
         # Note: decided not to put a partial implementation of this in and will circle back to handle this later.
         if 'locality_multiplier' in self.conf['scoring']:
             lm = 0
