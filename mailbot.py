@@ -239,13 +239,13 @@ class MailBot:
                 try:
                     log.debug('Attempting to send message from: ' + str(sender_email) + ' to user email: ' + str(user_email) + " Message is: " + eml.as_string())
                     server.sendmail(eml['From'], { eml['To'], sender_email }, eml.as_string())
-                    # If we get here we're done!
+                    # If we get here then the email was sent.
                     log.debug('Sent Successfully!')
                     break
                 except Exception as e:
                     # OK. Try again, but not forever..
                     if nextAttempt > 2600:
-                        # Doing the math, we've now waited 42 minutes after 6 retries.
+                        # Doing the math, the user has now waited 42 minutes after 6 retries.
                         log.error('Failed to send message: ' + str(e) + ". Have tried now for more than 40 minutes. Giving up.")
                         break
                     log.error('Failed to send message: ' + str(e) + ". Trying again in " + str(nextAttempt) + " seconds.")
