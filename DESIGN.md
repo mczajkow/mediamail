@@ -102,9 +102,9 @@ Possible commands are:
 * `reply`: This sends a post back to the platform. The text following the word reply (after the space) is sent as-is. Some platforms have a limit on how much text you can reply with and some require that the author's name be included. Replybot will handle that, but keep in mind that if the response is too long nothing will happen other than a warning log message.
 
 
-
 ## Scoring
-Each message sent to the user via an email has an `integer` score associated with it. This is determined by several factors which are configured in Mailbot's mailbot.json (see above). 
+Each message sent to the user via an email has an `integer` score associated with it. This is determined by several factors which are configurable.
+ 
 
 Scoring is determined as follows:
 * Disinterested Words: A dictionary of `string:integer` where each string is a key word of disinterest to the user being sent the mail. This does not act as a filter, rather as a means to score messages. The `integer` specified is how many points are subtracted for that word. Recommended that each `integer` be at least -25 as keyword matches are not important to bury less important messages.
@@ -114,6 +114,12 @@ Scoring is determined as follows:
 * Number of points per word in the message: Short messages are less intereting. It was once said the average length of a tweet is 6 characters. The number of points per word is configured in the `points_per_word` setting. Recommended value is `1`.
 * Shoutout Heck:  Many times a message may come in with many shoutouts (e.g. the `@` symbol) in it which are just very short messages that are designed to grab a lot of attention. This is an `integer` that will be decremented of the overall score per shoutout used. Recommended value is -50.
 * Shoutout to Me: If a message is directed to the user, additional scoring can happen. This is checked by comparing the references in the message compared to what is configured in the `user_identification` global.json setting under the sub-property `social_media_handles`. Recommended value is 500, to elevate these above the others.
+
+### Scoring in Mailbot
+Mailbot uses scores to assign priorities to what messages are surfaced to the top of the query stanza in the email sent to the user. The higher the score, the further up it goes.
+
+### Scoring in Platform bots
+Platform bots (e.g. Twitterbog) use the scoring configuration to determine if it should even be sent into Elastic Search, with a minimum score found in the filters section of the configuration.
 
 ## Glossary
 * message: Every social media platform contains messages, e.g. posts, Tweets, etc. This term is broadly used to describe a specific instance.

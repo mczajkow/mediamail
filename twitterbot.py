@@ -7,7 +7,7 @@ from tweepy import Stream
 from tweepy.streaming import StreamListener
 from tweepy.utils import parse_datetime
 from textblob import TextBlob
-from utils import ConfigFileHelper, TwitterHelper, ElasticSearchHelper
+from utils import ConfigFileHelper, TwitterHelper, ElasticSearchHelper, ScoringHelper
 
 log = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ class TwitterBot(StreamListener):
         configHelper = ConfigFileHelper(configFile)
         self.conf = configHelper.getConf()
         self.twitterHelper = TwitterHelper(self.conf)
+        self.scoringHelper = ScoringHelper(self.conf)
         log.debug(str(self.conf))
         # Elastic Search: setup
         if 'elastic' not in self.conf:
@@ -225,9 +226,22 @@ class TwitterBot(StreamListener):
         url = None
         if 'id_str' in tweetData:
             url = 'https://twitter.com/x/status/' + tweetData['id_str']
-        log.debug('Inserting fully parsed Tweet into Elastic Search')
-        self.elasticSearchHelper.storeData(authorName, authorLocation, screenName, createdAt, hashtags, localityConfidence, location, placeName, placeFullName, textB.sentiment.polarity, references, 'twitter', sentiment, textB.sentiment.subjectivity, tweetText, tokens, url)
-        log.debug('Elastic Search update complete.')
+        log.debug('Creating Elastic Search data')
+        elasticSearchDictionary = self.elasticSearchHelper.createRecord(authorName, authorLocation, screenName, createdAt, hashtags, localityConfidence, location, placeName, placeFullName, textB.sentiment.polarity, references, 'twitter', sentiment, textB.sentiment.subjectivity, tweetText, tokens, url)        
+        # Filter out low scoring records.
+        if 'filters' in self.conf and 'minimum_score' in self.conf['filters']:
+            log.debug('Now scoring the data record to see if it meets minimum scoring criteria')
+            minimumScore = self.conf['filters']['minimum_score']
+            tweetScore = self.scoringHelper.scoreContent(elasticSearchDictionary)
+            if tweetScore <= minimumScore:
+                # Nope, ignore it.
+                log.debug('The tweet data given is too low in value, its score was: '+str(tweetScore)+" and minimally needed: "+str(minimumScore))
+                return
+            else:
+                log.debug('The tweet data given is high enough in value, its score was: '+str(tweetScore)+" and minimally needed: "+str(minimumScore))
+        log.debug('Storing Elastic Search data')
+        self.elasticSearchHelper.storeData(elasticSearchDictionary)
+        log.debug('Elastic Search update complete')
                                 
     def on_error(self, status):
         '''

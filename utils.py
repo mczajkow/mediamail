@@ -90,6 +90,108 @@ class ElasticSearchHelper:
         # This class also needs access to an instance of MMIDHelper.
         self.mmidHelper = MMIDHelper(conf)
              
+    def createRecord(self, author=None, authorLocation=None, authorScreenName='Unknown', createdAt=None, hashtags=[], location=None, localityConfidence=0.0, placeName=None, placeFullName=None, polarity=None, references=[], source=None, sentiment=None, subjectivity=None, text=None, tokens=[], url=None):
+        '''
+        Creates a full dictionary object that goes into ElasticSearch.
+        
+        -- author string, the name of the author. Optional, not required to be put into the index.
+        -- authorLocation string, the location of the author. Optional, not required to put into the index.
+        -- authorScreenName string, the social media handle or screen name. Optional, if not provided then 'Unknown' is used.
+        -- createdAt string, the date and time the tweet was made in ISO 8601 format. Required, without it we can't really query it back. If not provided then a DEBUG log will be made and nothing done. ISO 8601 formatting is not enforced by this method. Providing anything else would cause the message to be indexed but never found in a time based query.
+        -- hashtags list of string, the hashtags used within the body of the message (e.g. #fun). Optional, if not provided then an empty list is indexed.
+        -- location string, in the format of Lat,Lon where Lat and Lon are floats in degrees. Optional, if not provided then nothing is put in the index.
+        -- locatlityConfidence float, a number from 0.0 to 1.0 indicating the confidence on how local to the configured location this author is physically. Required, default is 0.0. If a non-number or out of range number is provided, then a DEBUG log will be made and nothing done.
+        -- placeName string, the name of the place the author of the message is. Optional, not required to be put into the index.
+        -- placeFullName string, the full unabbreviated place name the author of the message is. Optional not required to be put into the index.
+        -- polatity float, a number -1.0 to 1.0. @see https://en.wikipedia.org/wiki/Sentiment_analysis. Optional, not required to be put in the index. If provided, it must be a float type and within the range. If not, it will not be put into the index.
+        -- references list of string, a list of references made within the text (e.g. @johndoe). Optional, if not provided then an empty list is indexed.
+        -- sentiment string, @see https://en.wikipedia.org/wiki/Sentiment_analysis. Should be one of ['negative','neutral','positive']. Optional, not required to be put into the index.
+        -- source string, the name of the social media platform storing data. Optional, not required to be put into the index.
+        -- subjectivity float, a number -1.0 to 1.0. @see https://en.wikipedia.org/wiki/Sentiment_analysis. Optional, not required to be put into the index. If provided, it must be a float type within the range. If not, it will not be put into the index.
+        -- text string, the body of the message being indexed. Required, without it there is no data. If not provided, then a DEBUG log will be made and nothing done.
+        -- tokens list of string, the text of the message broken down into single words for token matching purposes. Optional, if not provided then an empty list is indexed.
+        -- url string, the URL directly to the message on the media platform. Optional. If not supplied, nothing will be put in the index.        
+        @return dictionary, containing all the fields given that could be stored directly as data into ElasticSeach
+        '''
+        body = {}
+        # Check each field for None and then do the appropriate actions.
+        if author is not None:
+            body['author'] = author
+        if authorLocation is not None:
+            body['author_location'] = authorLocation
+        if authorScreenName is not None:
+            body['author_screen_name'] = authorScreenName
+        if createdAt is not None:
+            body['created_at'] = createdAt
+        else:
+            log.debug('Provided data to store has None createdAt. Ignoring.')
+            return
+        if hashtags is not None and isinstance(hashtags, list):
+            body['hashtags'] = hashtags
+        if location is not None:
+            body['location'] = location
+        if localityConfidence is not None:
+            lC = 0.0
+            try:
+                lC = float(locatlityConfidence)
+            except:
+                # Not a number.
+                log.debug('Provided data has a locality confidence that is not a float. Ignoring.')
+                return
+            if lC < 0.0 or lc > 1.0:
+                log.debug('Provided data has a locality confidence that is not between 0.0 and 1.0 inclusive. Ignoring.')
+                return
+            body['locality_confidence'] = lC
+        else:
+            body['locality_confidence'] = 0.0  # Default is zero.
+        if placeName is not None:
+            body['place_name'] = placeName
+        if placeFullName is not None:
+            body['place_full_name'] = placeFullName
+        if polarity is not None:
+            pol = 0.0
+            try:
+                pol = float(polarity)
+                if pol >= -1.0 or pol <= 1.0:
+                    body['polarity'] = pol
+                # If not in the range, don't set polarity
+            except:
+                # Not a number. Just don't set polarity
+                pass
+        if references is not None and isinstance(references, list):
+            body['references'] = references
+        if sentiment is not None:
+            if sentiment == 'neutral' or sentiment == 'positive' or sentiment == 'negative':
+                body['sentiment'] = sentiment
+        if source is not None:
+            body['source'] = source
+        if subjectivity is not None:
+            sub = 0.0
+            try:
+                sub = float(subjectivity)
+                if sub >= -1.0 or sub <= 1.0:
+                    body['subjectivity'] = sub
+                # If not in the range, don't set polarity
+            except:
+                # Not a number. Just don't set polarity
+                pass
+        if text is not None:
+            body['text'] = text
+        else:
+            log.debug('Provided data to store has None text. Ignoring.')
+            return
+        if tokens is not None and isinstance(tokens, list):
+            body['tokens'] = tokens
+        if url is not None:
+            body['url'] = url
+        # Generate a unique ID.
+        # TODO #21-Move-MMID-Generation-out-of-ElasticSearchHelper: This next line seems like it should not be in this class. It makes a cleaner design to pass this in. It makes ElasticSearchHelper no longer need a MMIDHelper and the oddity of the constructor requiring the entire configuration after only requiring a sub-set. Remove this here and put it in the calling class.
+        body['mmid'] = self.mmidHelper.generateID()
+        # wait 0.01 to the next record, to ensure it would have a unique mmid.
+        time.sleep(0.01)
+        # All done!
+        return body
+
     def parseQueryResults(self, queryResults, mmid=None):
         '''
         The contents of a query in Elastic Search have a lot of extra Elastic Search metadata in them. This method will pull out the record(s) stored as-is and return them in a list.
@@ -170,113 +272,20 @@ class ElasticSearchHelper:
         except Exception as e:
             log.error('Failed query to Elastic Search for this query: ' + str(queryDict) + " Error is: " + str(e))
         
-    def storeData(self, author=None, authorLocation=None, authorScreenName='Unknown', createdAt=None, hashtags=[], location=None, localityConfidence=0.0, placeName=None, placeFullName=None, polarity=None, references=[], source=None, sentiment=None, subjectivity=None, text=None, tokens=[], url=None):
+    def storeData(self, elasticSearchDictionary):
         '''
-        Stores data given into ElasticSearch.
+        Stores the given dictionary into Elastic Search
         
-        -- author string, the name of the author. Optional, not required to be put into the index.
-        -- authorLocation string, the location of the author. Optional, not required to put into the index.
-        -- authorScreenName string, the social media handle or screen name. Optional, if not provided then 'Unknown' is used.
-        -- createdAt string, the date and time the tweet was made in ISO 8601 format. Required, without it we can't really query it back. If not provided then a DEBUG log will be made and nothing done. ISO 8601 formatting is not enforced by this method. Providing anything else would cause the message to be indexed but never found in a time based query.
-        -- hashtags list of string, the hashtags used within the body of the message (e.g. #fun). Optional, if not provided then an empty list is indexed.
-        -- location string, in the format of Lat,Lon where Lat and Lon are floats in degrees. Optional, if not provided then nothing is put in the index.
-        -- locatlityConfidence float, a number from 0.0 to 1.0 indicating the confidence on how local to the configured location this author is physically. Required, default is 0.0. If a non-number or out of range number is provided, then a DEBUG log will be made and nothing done.
-        -- placeName string, the name of the place the author of the message is. Optional, not required to be put into the index.
-        -- placeFullName string, the full unabbreviated place name the author of the message is. Optional not required to be put into the index.
-        -- polatity float, a number -1.0 to 1.0. @see https://en.wikipedia.org/wiki/Sentiment_analysis. Optional, not required to be put in the index. If provided, it must be a float type and within the range. If not, it will not be put into the index.
-        -- references list of string, a list of references made within the text (e.g. @johndoe). Optional, if not provided then an empty list is indexed.
-        -- sentiment string, @see https://en.wikipedia.org/wiki/Sentiment_analysis. Should be one of ['negative','neutral','positive']. Optional, not required to be put into the index.
-        -- source string, the name of the social media platform storing data. Optional, not required to be put into the index.
-        -- subjectivity float, a number -1.0 to 1.0. @see https://en.wikipedia.org/wiki/Sentiment_analysis. Optional, not required to be put into the index. If provided, it must be a float type within the range. If not, it will not be put into the index.
-        -- text string, the body of the message being indexed. Required, without it there is no data. If not provided, then a DEBUG log will be made and nothing done.
-        -- tokens list of string, the text of the message broken down into single words for token matching purposes. Optional, if not provided then an empty list is indexed.
-        -- url string, the URL directly to the message on the media platform. Optional. If not supplied, nothing will be put in the index.
+        -- elasticSearchDictionary, dictionary. Required. Should come from calling createRecord. If None is supplied, nothing happens outside of a warning.
+        @see createRecord
         '''
-        body = {}
-        # Check each field for None and then do the appropriate actions.
-        if author is not None:
-            body['author'] = author
-        if authorLocation is not None:
-            body['author_location'] = authorLocation
-        if authorScreenName is not None:
-            body['author_screen_name'] = authorScreenName
-        if createdAt is not None:
-            body['created_at'] = createdAt
-        else:
-            log.debug('Provided data to store has None createdAt. Ignoring.')
-            return
-        if hashtags is not None and isinstance(hashtags, list):
-            body['hashtags'] = hashtags
-        if location is not None:
-            body['location'] = location
-        if localityConfidence is not None:
-            lC = 0.0
-            try:
-                lC = float(locatlityConfidence)
-            except:
-                # Not a number.
-                log.debug('Provided data has a locality confidence that is not a float. Ignoring.')
-                return
-            if lC < 0.0 or lc > 1.0:
-                log.debug('Provided data has a locality confidence that is not between 0.0 and 1.0 inclusive. Ignoring.')
-                return
-            body['locality_confidence'] = lC
-        else:
-            body['locality_confidence'] = 0.0  # Default is zero.
-        if placeName is not None:
-            body['place_name'] = placeName
-        if placeFullName is not None:
-            body['place_full_name'] = placeFullName
-        if polarity is not None:
-            pol = 0.0
-            try:
-                pol = float(polarity)
-                if pol >= -1.0 or pol <= 1.0:
-                    body['polarity'] = pol
-                # If not in the range, don't set polarity
-            except:
-                # Not a number. Just don't set polarity
-                pass
-        if references is not None and isinstance(references, list):
-            body['references'] = references
-        if sentiment is not None:
-            if sentiment == 'neutral' or sentiment == 'positive' or sentiment == 'negative':
-                body['sentiment'] = sentiment
-        if source is not None:
-            body['source'] = source
-        if subjectivity is not None:
-            sub = 0.0
-            try:
-                sub = float(subjectivity)
-                if sub >= -1.0 or sub <= 1.0:
-                    body['subjectivity'] = sub
-                # If not in the range, don't set polarity
-            except:
-                # Not a number. Just don't set polarity
-                pass
-        if text is not None:
-            body['text'] = text
-        else:
-            log.debug('Provided data to store has None text. Ignoring.')
-            return
-        if tokens is not None and isinstance(tokens, list):
-            body['tokens'] = tokens
-        if url is not None:
-            body['url'] = url
-        # Generate a unique ID.
-        # TODO #21-Move-MMID-Generation-out-of-ElasticSearchHelper: This next line seems like it should not be in this class. It makes a cleaner design to pass this in. It makes ElasticSearchHelper no longer need a MMIDHelper and the oddity of the constructor requiring the entire configuration after only requiring a sub-set. Remove this here and put it in the calling class.
-        body['mmid'] = self.mmidHelper.generateID()
-        # wait 0.01 to the next record, to ensure it would have a unique mmid.
-        time.sleep(0.01)
-        log.debug('Inserting into Elastic Search this body: ' + str(body))
+        log.debug('Inserting into Elastic Search this record: ' + str(elasticSearchDictionary))
         try:
             self.elasticSearch.index(index=self.elasticSearchIndex,
                      doc_type="test-type",
-                     body=body)
+                     body=elasticSearchDictionary)
         except Exception as e:
             log.error("Could not index in Elastic Search: " + str(e))
-
-
 
 class MMIDHelper:
     '''
