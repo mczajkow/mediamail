@@ -234,14 +234,23 @@ class MailBot:
                 log.debug("Logging on with configured username: " + smtp_username + " and password.")
                 server.login(smtp_username, smtp_password)
             # Send the message
-            try:
-                log.debug('Sending message from: ' + str(sender_email) + ' to user email: ' + str(user_email) + " Message is: " + eml.as_string())
-                server.sendmail(eml['From'], { eml['To'], sender_email }, eml.as_string())
-            except Exception as e:
-                # TODO #15-Mailbot-to-Handle-SMTP-Errors: There seems to be error code 550 coming back that I can't send the emails. Should we retry?
-                log.error('Failed to send message: ' + str(e))
-                return
-            log.debug('Sent Successfully!')
+            while True:
+                nextAttempt = 10
+                try:
+                    log.debug('Attempting to send message from: ' + str(sender_email) + ' to user email: ' + str(user_email) + " Message is: " + eml.as_string())
+                    server.sendmail(eml['From'], { eml['To'], sender_email }, eml.as_string())
+                    # If we get here we're done!
+                    log.debug('Sent Successfully!')
+                    break
+                except Exception as e:
+                    if nextAttempt > 2600:
+                        # Doing the math, we've now waited 42 minutes after 6 retries.
+                        log.error('Failed to send message: ' + str(e) + ". Have tried now for more than 40 minutes. Giving up.")
+                        break
+                    log.error('Failed to send message: ' + str(e) + ". Trying again in " + str(nextAttempt) + " seconds.")
+                time.sleep(float(nextAttempt) / 60.0)
+                # Now double the next attempt.
+                nextAttempt = nextAttempt * 2
     
     def sortReplies(self, replyList):
         '''
