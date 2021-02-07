@@ -4,6 +4,7 @@ import jaraco.logging
 import logging
 import smtplib
 import ssl
+import time
 from email.mime.text import MIMEText
 from utils import ConfigFileHelper, ElasticSearchHelper, ScoringHelper
 
@@ -225,31 +226,31 @@ class MailBot:
         eml['To'] = user_email
         # Send tha mail
         context = ssl.create_default_context()
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.ehlo()  # Can be omitted
-            server.starttls(context=context)
-            server.ehlo()  # Can be omitted
-            # Only log on if username and password is presented.
-            if smtp_username is not None and smtp_password is not None:
-                log.debug("Logging on with configured username: " + smtp_username + " and password.")
-                server.login(smtp_username, smtp_password)
-            # Send the message
-            while True:
-                nextAttempt = 10.0
-                try:
+        # Keep trying until we succeed.
+        nextAttempt = 10.0            
+        while True:
+            try:
+                with smtplib.SMTP(smtp_host, smtp_port) as server:
+                    server.ehlo()  # Can be omitted
+                    server.starttls(context=context)
+                    server.ehlo()  # Can be omitted
+                    # Only log on if username and password is presented.
+                    if smtp_username is not None and smtp_password is not None:
+                        log.debug("Logging on with configured username: " + smtp_username + " and password.")
+                        server.login(smtp_username, smtp_password)
                     log.debug('Attempting to send message from: ' + str(sender_email) + ' to user email: ' + str(user_email) + " Message is: " + eml.as_string())
                     server.sendmail(eml['From'], { eml['To'], sender_email }, eml.as_string())
                     # If we get here then the email was sent.
                     log.debug('Sent Successfully!')
                     break
-                except Exception as e:
-                    # OK. Try again, but not forever..
-                    if nextAttempt > 2600:
-                        # Doing the math, the user has now waited 42 minutes after 6 retries.
-                        log.error('Failed to send message: ' + str(e) + ". Have tried now for more than 40 minutes. Giving up.")
-                        break
-                    log.error('Failed to send message: ' + str(e) + ". Trying again in " + str(nextAttempt) + " seconds.")
-                time.sleep(nextAttempt / 60.0)
+            except Exception as e:
+                # OK. Try again, but not forever..
+                if nextAttempt > 2600:
+                    # Doing the math, the user has now waited 42 minutes after 6 retries.
+                    log.error('Failed to send message: ' + str(e) + ". Have tried now for more than 40 minutes. Giving up.")
+                    break
+                log.error('Failed to send message: ' + str(e) + ". Trying again in " + str(nextAttempt) + " seconds.")
+                time.sleep(nextAttempt)
                 # Now double the next attempt.
                 nextAttempt = nextAttempt * 2
     
