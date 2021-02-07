@@ -2,6 +2,7 @@ import argparse
 import email.utils
 import jaraco.logging
 import logging
+import re
 import smtplib
 import ssl
 import time
@@ -312,11 +313,15 @@ class MailBot:
             log.debug('Ignoring message stored in Elastic Search because it has no text content.')
             return
         for listItem in repliesList:
-            # Note: listItem's text will be set otherwise it could not have been added into the list already. This check is done later.
-            if hash(listItem['text']) == hash(record['text']):
-                # It is a duplicate.
+            # See if the strings after removing all non alpha-numeric characters and casting to lower case are the same.
+            listText = listItem['text'] # Note: listItem's text will be set otherwise it could not have been added into the list already. This check is done later for entries successfully added already.
+            recordText = record['text']
+            listTextCleaned = re.sub(r'[^a-zA-Z0-9]','',listText.lower())
+            recordTextCleaned = re.sub(r'[^a-zA-Z0-9]','',recordText.lower())            
+            if hash(listTextCleaned) == hash(recordTextCleaned):
+                # It is a duplicate if they are identical.
                 log.debug('Duplicate record text found from the query. Ignoring the same message text.')
-                return
+                return            
         # Next, the score is needed to ascertain where it goes in the replyToUse's replies list (or if at all).
         scoreOfRecord = self.scoringHelper.scoreContent(record)
         # Add the item at the end of the replies list.
