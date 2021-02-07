@@ -249,7 +249,7 @@ class MailBot:
                     # Doing the math, the user has now waited 42 minutes after 6 retries.
                     log.error('Failed to send message: ' + str(e) + ". Have tried now for more than 40 minutes. Giving up.")
                     break
-                log.error('Failed to send message: ' + str(e) + ". Trying again in " + str(nextAttempt) + " seconds.")
+                log.error('Failed to send message: ' + str(e) + ". Trying again in " + str(int(nextAttempt)) + " seconds.")
                 time.sleep(nextAttempt)
                 # Now double the next attempt.
                 nextAttempt = nextAttempt * 2
