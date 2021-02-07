@@ -135,7 +135,7 @@ class ElasticSearchHelper:
             try:
                 lC = float(locatlityConfidence)
             except:
-                # Not a number.
+                # Not a number?
                 log.debug('Provided data has a locality confidence that is not a float. Ignoring.')
                 return
             if lC < 0.0 or lc > 1.0:

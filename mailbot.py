@@ -306,6 +306,17 @@ class MailBot:
             log.warning('Did not find the reply for query title: ' + query['title'] + ' in the globalReply. The class wasn\'t set up right. Skipping updateGlobalReply for this title.')
             return
         repliesList = replyToUse['replies']
+        # Now scan over all of the existing replies in this list to see if the text has already been set (e.g. a duplicate message). If so, don't go further.
+        if 'text' not in record or len(record['text']) == 0:
+            # The elastic search data is empty. Nothing to compare duplicates for or score.
+            log.debug('Ignoring message stored in Elastic Search because it has no text content.')
+            return
+        for listItem in repliesList:
+            # Note: listItem's text will be set otherwise it could not have been added into the list already. This check is done later.
+            if hash(listItem['text']) == hash(record['text']):
+                # It is a duplicate.
+                log.debug('Duplicate record text found from the query. Ignoring the same message text.')
+                return
         # Next, the score is needed to ascertain where it goes in the replyToUse's replies list (or if at all).
         scoreOfRecord = self.scoringHelper.scoreContent(record)
         # Add the item at the end of the replies list.
