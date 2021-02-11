@@ -144,6 +144,22 @@ class TwitterBot(StreamListener):
         log.debug('Incoming tweet, text: ' + str(tweetText))        
         # Reset the self.twitterErrorCounter to zero. We have something that is good.
         self.twitterErrorCounter = 0
+        # Next, check the language of the tweet and only allow further processing if the language is configured as supported.
+        if 'filters' in self.conf and 'laguages' in self.conf['filters'] and self.conf['filetrs']['languages'] is not None and isinstance(self.conf['filters']['languages'], list):
+            # Now look at the language of the tweet:
+            if 'lang' in tweetData and tweetData['lang'] is not None:
+                languageOfTweet = tweetData['lang']
+                if languageOfTweet in self.conf['filters']['languages']:
+                    # This is acceptable.
+                    log.debug('Tweet is an acceptable langugage by the configured language filter.')
+                else:
+                    # Not acceptable
+                    log.debug('Tweet has language: ' + str(languageOfTweet) + ' which is not in the configured language filter. Ignoring.')
+                    return
+            else:
+                # If the tweet doesn't have a language but we do have filters, we can not let it pass.
+                log.debug('Tweet has no specified language, thus it can not be verified in the list of filtered languages. Ignoring.')
+                return
         # Check black and white listed words in the text, in that order.
         if 'filters' in self.conf and 'blacklist_words' in self.conf['filters']:
             for word in self.conf['filters']['blacklist_words']:
@@ -156,7 +172,7 @@ class TwitterBot(StreamListener):
                 if str(word).lower() not in str(tweetText).lower():
                     # Whitelisted. Ignore it.
                     log.debug('Tweet did not contain whitelisted word: ' + str(word) + '. Ignoring.')
-                    return
+                    return        
         # Next we pull out of the tweet data all the things needed to put into Elastic Search
         authorName = None
         authorLocation = None
@@ -235,10 +251,10 @@ class TwitterBot(StreamListener):
             tweetScore = self.scoringHelper.scoreContent(elasticSearchDictionary)['overall']
             if tweetScore <= minimumScore:
                 # Nope, ignore it.
-                log.debug('The tweet data given is too low in value, its score was: '+str(tweetScore)+" and minimally needed: "+str(minimumScore))
+                log.debug('The tweet data given is too low in value, its score was: ' + str(tweetScore) + " and minimally needed: " + str(minimumScore))
                 return
             else:
-                log.debug('The tweet data given is high enough in value, its score was: '+str(tweetScore)+" and minimally needed: "+str(minimumScore))
+                log.debug('The tweet data given is high enough in value, its score was: ' + str(tweetScore) + " and minimally needed: " + str(minimumScore))
         log.debug('Storing Elastic Search data')
         self.elasticSearchHelper.storeData(elasticSearchDictionary)
         log.debug('Elastic Search update complete')
