@@ -287,6 +287,7 @@ class ElasticSearchHelper:
         except Exception as e:
             log.error("Could not index in Elastic Search: " + str(e))
 
+
 class MMIDHelper:
     '''
     MMIDHelper provides functions to generate, check, and manage MMIDs (media mail IDs)
@@ -578,31 +579,38 @@ class ScoringHelper:
         Takes data stored in Elastic Search and then assigns priority to it based on the content and what is in the configuration.
 
         -- record dictionary, a record found in Elastic Search. Required. If none, the default zero score is returned and a warning issued.        
-        @return integer, the score for that query data based on configuration. Scores can be any number including negatives.
+        @return dictionary, the overall score is an integer is found in "overall", the other keys found are the various components of the score.
         @see DESIGN.md
         @see ElasticSearchHelper
         '''
+        scoreDictionary = {}
+        scoreDictionary['overall'] = 0  # start off at zero
         if record is None:
             log.warning('Could not score data as None was passed in. Zero being returned')
-            return 0
+            return scoreDictionary
         if isinstance(record, dict) is False:
             log.warning('Data passed into scoreContent is not a dictionary. Zero being returned')
-            return 0
+            return scoreDictionary
         # Similarly we need the section 'scoring' to be there too
         if 'scoring' not in self.conf:
             log.warning('There is no scoring section in the configuration. Returning 0.')
-            return 0
-        score = 0  # start off at zero
+            return scoreDictionary
         # LENGTH - score points based on how many tokens arein the record.
         if 'points_per_word' in self.conf['scoring']:
             ppw = 0
+            lengthScore = 0
             try:
                 ppw = int(self.conf['scoring']['points_per_word'])
             except Exception as e:
                 # Not an integer?
                 log.debug('Could not utilize points_per_word in the scoring section of the configuration: ' + str(e))
             if 'text' in record:
-                score += (len(record['text'].split(' ')) * ppw)
+                # Break up the text by space. Only count words that are actually not blank.
+                textParts = record['text'].split(' ')
+                for textPart in textParts:
+                    if len(textPart) > 0:
+                        lengthScore += ppw
+                scoreDictionary['length'] = lengthScore
             else:
                 log.debug('Data record from Elastic Search had no text in it. No length based scoring was done.')
         # LOCALITY
@@ -616,9 +624,11 @@ class ScoringHelper:
                 # Not an integer?
                 log.debug('Could not utilize locality_multiplier in the scoring section of the configuration: ' + str(e))
             if 'locality_confidence' in record:
-                score += float(lm) * record['locality_confidence']
+                localityMultiplierScore = float(lm) * record['locality_confidence']
+                scoreDictionary['locality_multiplier'] = localityMultiplierScore
         # TODO #7-Redesign-Follower-Scoring: Twitterchat had this capability but Mediamail has to implement this differently. It would need to be the follower of the user who gets the e-mail.
         # KEYWORDS of INTEREST
+        scoreDictionary['keywords_of_interest'] = 0
         if 'interested_words' in self.conf['scoring']:
             # Parse each one, provided a dictionary was given.
             if isinstance(self.conf['scoring']['interested_words'], dict) is False:
@@ -633,8 +643,9 @@ class ScoringHelper:
                         log.debug('Keyword of interest has a non-integer value for word: ' + str(keyword))
                     if 'text' in record and keyword.lower() in record['text'].lower():
                         log.debug('Found a matching keyword: ' + str(keyword) + ' within the record.')
-                        score = score + points
+                        scoreDictionary['keywords_of_interest'] += points
         # KEYWORDS of DISINTEREST
+        scoreDictionary['keywords_of_disinterest'] = 0
         if 'disinterested_words' in self.conf['scoring']:
             # Parse each one, provided a dictionary was given.
             if isinstance(self.conf['scoring']['disinterested_words'], dict) is False:
@@ -649,7 +660,7 @@ class ScoringHelper:
                         log.debug('Keyword of disinterest has a non-integer value for word: ' + str(keyword))
                     if 'text' in record and keyword.lower() in record['text'].lower():
                         log.debug('Found a matching keyword: ' + str(keyword) + ' within the record.')
-                        score = score - points
+                        scoreDictionary['keywords_of_disinterest'] += points
         # TODO #17-Eliminate-Interest-and-Disinterest-Word-Scoring: Having a distinction between these two (interest and disinterest) makes no sense. Rather just a global keyword scoring allowing any positive or negative number makes better sense.
         # TODO #9-Implement Derivative Message Scoring: Re-work the index to store a flag for derived messages like re-tweets and then score them separately.
         # HASHTAG and SHOUTOUT HECK
@@ -661,7 +672,7 @@ class ScoringHelper:
                     hh = int(self.conf['scoring']['hashtag_heck'])
                 except Exception as e:
                     log.error('Hashtag heck value in the configuration is not an integer. Won\'t score on any hashtag')
-                score += (len(record['hashtags']) * hh)
+                scoreDictionary['hashtags'] = (len(record['hashtags']) * hh)
         if 'references' in record and isinstance(record['references'], list) and len(record['references']) > 0:
             # By getting here, there is a list of references in the record that should be scored.
             sh = 0
@@ -670,7 +681,7 @@ class ScoringHelper:
                     sh = int(self.conf['scoring']['shoutout_heck'])
                 except Exception as e:
                     log.error('Shoutout heck value in the configuration is not an integer. Won\'t score on any shoutout')
-                score += (len(record['references']) * sh)
+                scoreDictionary['references'] = (len(record['references']) * sh)
         # SHOUT OUTS TO ME
         if 'user_identification' in self.conf and isinstance(self.conf['user_identification'], dict) and 'social_media_handles' in self.conf['user_identification'] and isinstance(self.conf['user_identification']['social_media_handles'], list) and len(self.conf['user_identification']['social_media_handles']) > 0:
             # By getting here, there are social media handles associated with the user worth checking. 
@@ -686,6 +697,11 @@ class ScoringHelper:
                     for reference in record['references']:
                         if handle.lower() in reference.lower():
                             # Match. The references contain @ whereas the handles do not have to.
-                            score += rtm
-        log.debug('Assigning score value of: ' + str(score) + ' to the record')
-        return score
+                            scoreDictionary['shoutouts_to_me'] = rtm
+        # Tally up the overall score
+        overall = 0
+        for component in scoreDictionary:
+            overall += scoreDictionary[component]
+        scoreDictionary['overall'] = overall         
+        log.debug('Assigning overall score value of: ' + str(overall) + ' to the record')
+        return scoreDictionary

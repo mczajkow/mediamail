@@ -232,7 +232,7 @@ class TwitterBot(StreamListener):
         if 'filters' in self.conf and 'minimum_score' in self.conf['filters']:
             log.debug('Now scoring the data record to see if it meets minimum scoring criteria')
             minimumScore = self.conf['filters']['minimum_score']
-            tweetScore = self.scoringHelper.scoreContent(elasticSearchDictionary)
+            tweetScore = self.scoringHelper.scoreContent(elasticSearchDictionary)['overall']
             if tweetScore <= minimumScore:
                 # Nope, ignore it.
                 log.debug('The tweet data given is too low in value, its score was: '+str(tweetScore)+" and minimally needed: "+str(minimumScore))

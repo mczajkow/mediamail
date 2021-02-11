@@ -118,18 +118,17 @@ class MailBot:
                 # Now update the global reply for this query.
                 self.updateGlobalReply(reply, query)
 
-    def prepareRecord(self, record, score=0):
+    def prepareRecord(self, record, scoreOfRecord={'overall' : 0}):
         '''
         Creates a record to be put into the globalReply from an Elastic Search record passed in. See DESIGN.md for more information.
         
         -- record dictionary, an Elastic Search stored record. Required, if not given then None is returned.
-        -- score integer, the score of this record, see utils.ScoringHelper for more information. Optional, if not provided than a default 0 is used.
+        -- score dictionary, the overall score of the record is found in ['overall'] see utils.ScoringHelper for more information. Optional, if not provided then a zero score is used.
         @return: dictionary or None. Dictionary containing the information meant for the email, see DESIGN.md, to be put into globalReply. None if the input record is bad.
         '''
         if record is None or isinstance(record, dict) is False:
             return None
         prepared = {}
-        prepared['score'] = score
         if 'text' in record:
             prepared['text'] = record['text']
         else:
@@ -144,6 +143,11 @@ class MailBot:
             prepared['link'] = record['url']
         if 'author_screen_name' in record:
             prepared['author_screen_name'] = record['author_screen_name']
+        # Put in the overall score in score:
+        prepared['score'] = scoreOfRecord['overall']
+        if 'debug' in self.conf and isinstance(self.conf['debug'],dict) and 'enable_score_debugging' in self.conf['debug']:
+            # Then put the remaining items in the score as a separate entry.
+            prepared['score_justification'] = scoreOfRecord        
         return prepared
 
     def sendMail(self):
@@ -179,8 +183,9 @@ class MailBot:
             replyTitle = "Unspecified Title"
             if 'title' in reply and reply['title'] is not None:
                 replyTitle = reply['title']
-            body += replyTitle + "\n"
+            body += replyTitle + "\n=========================\n"
             # Generate a line for each of the replies
+            counter = 1
             for line in reply['replies']:
                 screenName = "Unknown"
                 if 'author_screen_name' in line and line['author_screen_name'] is not None:
@@ -195,16 +200,28 @@ class MailBot:
                 mmid = "[NONE]"
                 if 'mmid' in line and line['mmid'] is not None:
                     mmid = line['mmid']
-                score = 0
-                if 'score' in line and line['score'] is not None:
-                    score = line['score']
-                # TODO #14-Debug-Info-in-Mailbot-Emails: Put debug information like score in optionally.
-                body += screenName + ': ' + message + link + '[' + mmid + '] [' + str(score) + ']\n'
-            body += "\n"  # Separator for the next reply.
+                body += str(counter) +'.) '+ screenName + ': ' + message + link + '[' + mmid + ']'
+                # Put debug information in the email if it is requested. This includes reporting the score.
+                if 'debug' in self.conf and isinstance(self.conf['debug'],dict) and 'enable_score_debugging' in self.conf['debug'] and self.conf['debug']['enable_score_debugging'] is True:
+                    # Score is first in a []
+                    score = 0
+                    if 'score' in line:
+                        body += ' [' + str(line['score']) + ' ]'
+                    # Now make a separate section for all the other items in the record.
+                    if 'score_justification' in line and isinstance(line['score_justification'],dict):
+                        body += ' score_justification={'
+                        for justification in line['score_justification']:
+                            body += str(justification) + ": " + str(line['score_justification'][justification]) + ", "
+                        body += '}'
+                body += '\n---------\n'
+                counter += 1
+            body += "\n\n"  # Separator for the next reply.
         # Prepare the footer
         footer = ""
         # Assemble the full body
         fullBody = header + '\n' + body + '\n' + footer
+        # Log at info the body.
+        log.info('Email to be sent:\n------------------\n' + str(fullBody) + '\n\n------\nEnd Email\n')
         # Remove all characters not ascii.
         fullBody = fullBody.encode('ascii', errors='ignore')
         # Now gather the meta data and put into a MIMEText
@@ -239,8 +256,8 @@ class MailBot:
                     if smtp_username is not None and smtp_password is not None:
                         log.debug("Logging on with configured username: " + smtp_username + " and password.")
                         server.login(smtp_username, smtp_password)
-                    log.debug('Attempting to send message from: ' + str(sender_email) + ' to user email: ' + str(user_email) + " Message is: " + eml.as_string())
-                    server.sendmail(eml['From'], { eml['To'], sender_email }, eml.as_string())
+                    log.debug('Attempting to send message from: ' + str(sender_email) + ' to user email: ' + str(user_email))
+                    # server.sendmail(eml['From'], { eml['To'], sender_email }, eml.as_string())
                     # If we get here then the email was sent.
                     log.debug('Sent Successfully!')
                     break

@@ -1,4 +1,7 @@
 {
+	"debug": {
+		"enable_score_debugging": false
+	},
 	"email": {
 		"sender_address": "",
 		"smtp_password": "",
