@@ -145,7 +145,7 @@ class TwitterBot(StreamListener):
         # Reset the self.twitterErrorCounter to zero. We have something that is good.
         self.twitterErrorCounter = 0
         # Next, check the language of the tweet and only allow further processing if the language is configured as supported.
-        if 'filters' in self.conf and 'laguages' in self.conf['filters'] and self.conf['filetrs']['languages'] is not None and isinstance(self.conf['filters']['languages'], list):
+        if 'filters' in self.conf and 'languages' in self.conf['filters'] and self.conf['filters']['languages'] is not None and isinstance(self.conf['filters']['languages'], list):
             # Now look at the language of the tweet:
             if 'lang' in tweetData and tweetData['lang'] is not None:
                 languageOfTweet = tweetData['lang']
