@@ -118,7 +118,7 @@ class MailBot:
                 # Now update the global reply for this query.
                 self.updateGlobalReply(reply, query)
 
-    def prepareRecord(self, record, scoreOfRecord={'overall' : 0}):
+    def prepareRecord(self, record, scoreOfRecord={'overall': 0}):
         '''
         Creates a record to be put into the globalReply from an Elastic Search record passed in. See DESIGN.md for more information.
         
@@ -145,7 +145,7 @@ class MailBot:
             prepared['author_screen_name'] = record['author_screen_name']
         # Put in the overall score in score:
         prepared['score'] = scoreOfRecord['overall']
-        if 'debug' in self.conf and isinstance(self.conf['debug'],dict) and 'enable_score_debugging' in self.conf['debug']:
+        if 'debug' in self.conf and isinstance(self.conf['debug'], dict) and 'enable_score_debugging' in self.conf['debug']:
             # Then put the remaining items in the score as a separate entry.
             prepared['score_justification'] = scoreOfRecord        
         return prepared
@@ -200,19 +200,26 @@ class MailBot:
                 mmid = "[NONE]"
                 if 'mmid' in line and line['mmid'] is not None:
                     mmid = line['mmid']
-                body += str(counter) +'.) '+ screenName + ': ' + message + link + '[' + mmid + ']'
+                body += str(counter) + '.) ' + screenName + ': ' + message + link + '[' + mmid + ']'
                 # Put debug information in the email if it is requested. This includes reporting the score.
-                if 'debug' in self.conf and isinstance(self.conf['debug'],dict) and 'enable_score_debugging' in self.conf['debug'] and self.conf['debug']['enable_score_debugging'] is True:
-                    # Score is first in a []
-                    score = 0
-                    if 'score' in line:
-                        body += ' [' + str(line['score']) + ' ]'
-                    # Now make a separate section for all the other items in the record.
-                    if 'score_justification' in line and isinstance(line['score_justification'],dict):
-                        body += ' score_justification={'
-                        for justification in line['score_justification']:
-                            body += str(justification) + ": " + str(line['score_justification'][justification]) + ", "
-                        body += '}'
+                if 'debug' in self.conf and isinstance(self.conf['debug'], dict):
+                    # 1.) Print out how the score came to be:
+                    if 'enable_score_debugging' in self.conf['debug'] and self.conf['debug']['enable_score_debugging'] is True:
+                        # Score is first in a []
+                        score = 0
+                        if 'score' in line:
+                            body += ' [' + str(line['score']) + ' ]'
+                        # Now make a separate section for all the other items in the record.
+                        if 'score_justification' in line and isinstance(line['score_justification'], dict):
+                            body += ' score_justification={'
+                            for justification in line['score_justification']:
+                                body += str(justification) + ": " + str(line['score_justification'][justification]) + ", "
+                            body += '}'
+                    # 2.) Print out the message's hash value used to compare duplicates.
+                    if 'enable_message_hash' in self.conf['debug'] and self.conf['debug']['enable_message_hash'] is True:
+                        # Strip out all non-white space non alpha-numeric and print the value of that hash. This is used to eliminate duplicates.
+                        body += ' message_hash={' + str(hash(re.sub(r'[^a-zA-Z0-9]', '', message.lower()))) + '}'
+                    # TODO: More could be added here. It may make sense to put this in a separate function.
                 body += '\n---------\n'
                 counter += 1
             body += "\n\n"  # Separator for the next reply.
@@ -242,7 +249,12 @@ class MailBot:
         eml['Date'] = email.utils.formatdate(localtime=1)
         eml['From'] = sender_email
         eml['To'] = user_email
-        # Send tha mail
+        # Send the mail. However, there is a special flag in the debug section that allows the email to be prevented from being sent if the goal was to just read it on the command line only.
+        if 'debug' in self.conf and isinstance(self.conf['debug'],dict) and 'disable_email_sending' in self.conf['debug'] and self.conf['debug']['disable_email_sending'] is True:
+            # Do nothing more.
+            log.debug('Email not sent because the debug flag disable_email_sending is set to True.')
+            return
+        # Otherwise .. send tha mail
         context = ssl.create_default_context()
         # Keep trying until we succeed.
         nextAttempt = 10.0            
@@ -256,8 +268,9 @@ class MailBot:
                     if smtp_username is not None and smtp_password is not None:
                         log.debug("Logging on with configured username: " + smtp_username + " and password.")
                         server.login(smtp_username, smtp_password)
+                    # Send the mail.
                     log.debug('Attempting to send message from: ' + str(sender_email) + ' to user email: ' + str(user_email))
-                    # server.sendmail(eml['From'], { eml['To'], sender_email }, eml.as_string())
+                    server.sendmail(eml['From'], { eml['To'], sender_email }, eml.as_string())
                     # If we get here then the email was sent.
                     log.debug('Sent Successfully!')
                     break
@@ -331,10 +344,10 @@ class MailBot:
             return
         for listItem in repliesList:
             # See if the strings after removing all non alpha-numeric characters and casting to lower case are the same.
-            listText = listItem['text'] # Note: listItem's text will be set otherwise it could not have been added into the list already. This check is done later for entries successfully added already.
+            listText = listItem['text']  # Note: listItem's text will be set otherwise it could not have been added into the list already. This check is done later for entries successfully added already.
             recordText = record['text']
-            listTextCleaned = re.sub(r'[^a-zA-Z0-9]','',listText.lower())
-            recordTextCleaned = re.sub(r'[^a-zA-Z0-9]','',recordText.lower())            
+            listTextCleaned = re.sub(r'[^a-zA-Z0-9]', '', listText.lower())
+            recordTextCleaned = re.sub(r'[^a-zA-Z0-9]', '', recordText.lower())            
             if hash(listTextCleaned) == hash(recordTextCleaned):
                 # It is a duplicate if they are identical.
                 log.debug('Duplicate record text found from the query. Ignoring the same message text.')
