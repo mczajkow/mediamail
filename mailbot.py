@@ -219,7 +219,7 @@ class MailBot:
                     if 'enable_message_hash' in self.conf['debug'] and self.conf['debug']['enable_message_hash'] is True:
                         # Strip out all non-white space non alpha-numeric and print the value of that hash. This is used to eliminate duplicates.
                         body += ' message_hash={' + str(hash(re.sub(r'[^a-zA-Z0-9]', '', message.lower()))) + '}'
-                    # TODO: More could be added here. It may make sense to put this in a separate function.
+                    # TODO #32-Code-Cleanup-for-Mailbot-Debug-Information: More could be added here. It may make sense to put this in a separate function.
                 body += '\n---------\n'
                 counter += 1
             body += "\n\n"  # Separator for the next reply.
@@ -365,7 +365,6 @@ class MailBot:
         # Chop off the items at the end of the list if they exceed hit_limit.
         choppedList = sortedList[:hit_limit]
         # Put that choppedList back into the globalReply.
-        # TODO: I think we could just use the replyToUse.
         for reply in self.globalReply:
             if reply['title'] == query['title']:
                 reply['replies'] = choppedList
