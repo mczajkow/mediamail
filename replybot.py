@@ -203,9 +203,12 @@ class ReplyBot:
             try:
                 bodyParts = messageBody.lstrip().split(' ')[1:]
                 body = ' '.join(bodyParts)
-                self.processReply(mmid, body)
             except Exception as e:
                 log.warning('Failed to process reply command as nothing else was given other than the word "reply"')
+            try:
+                self.processReply(mmid, body)
+            except Exception as e:
+                log.error('Failed to process a reply: '+str(e))
         else:
             # Not supported. Log only at debug.
             log.debug('Unsupported command: ' + command)
@@ -275,7 +278,7 @@ class ReplyBot:
             # And put the author screen name into the message reply
             author = result['author_screen_name']            
             log.debug('Replying to this tweetID:' + str(tweetId) + ' to this author: ' + author + ' with this message: ' + body)
-            self.myTwitterHelper.reply(tweetId, message, author)
+            self.myTwitterHelper.reply(tweetId, body, author)
             log.debug('Done')                
         else:
             # Unsupported platform.
