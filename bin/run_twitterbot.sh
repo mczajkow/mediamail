@@ -1,9 +1,7 @@
-#!/usr/bin/bash
+#!/bin/bash
 while true
 do
-	pwd=`pwd`
-	echo $pwd
-	python3 $pwd/twitterbot.py -l $1 -c $2
+	python3 $1/twitterbot.py -l $2 -c $3
 	sleep 1
 	echo "Restarting program ..."
 done

@@ -215,7 +215,7 @@ class ReplyBot:
         This looks up the mmid in Elastic Search and using the contents of the record, sends a "like" to that particular author for the message given.
         
         -- mmid string, 5 characters in length. Required. Without this, nothing is processed and a warning issued.
-        -- body string, Required. Without this, nothing can be sent back. Body is also required to start with the @author name. If either criteria is not met, a warning is issued.
+        -- body string, required. Without this, nothing can be sent back. If this criteria is not met, a warning is issued.
         '''
         if mmid is None or len(mmid) != 5:
             log.warning('Can not process the reply command as the MMID given is None or less than 5 in length.')
@@ -268,17 +268,13 @@ class ReplyBot:
                 # Some problem in splitting up the url?
                 log.warning('Could not get the tweetId from the url: ' + str(result['url']) + '. Ignoring.')
                 return 
-            # Now get the author. For Twitter, it is required that the next word after the MMID is a shout-out, e.g. @johndoe
-            author = ''
-            parts = body.split(' ')
-            if parts[0][0] != '@':
-                log.warning('First word in the reply has to be an @ to direct the name of the person this goes to, for Twitter')
-                return 
-            author = parts[0][1:]                         
-            # And then get the rest of the message.
-            message = ' '.join(parts[1:])
-            
-            log.debug('Replying to this tweetID:' + str(tweetId) + ' to this author: ' + author + ' with this message: ' + message)
+            # Now, pull out the author_screen_name which is needed for all Twitter replies
+            if 'author_screen_name' not in result or result['author_screen_name'] is None:
+                log.warning('There is no author_screen_name set in the Elastic Search record. Can not reply.')
+                return
+            # And put the author screen name into the message reply
+            author = result['author_screen_name']            
+            log.debug('Replying to this tweetID:' + str(tweetId) + ' to this author: ' + author + ' with this message: ' + body)
             self.myTwitterHelper.reply(tweetId, message, author)
             log.debug('Done')                
         else:

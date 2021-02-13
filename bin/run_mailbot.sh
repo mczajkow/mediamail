@@ -1,4 +1,2 @@
-#!/usr/bin/bash
-pwd=`pwd`
-echo $pwd
-python3 $pwd/mailbot.py -l $1 -c $2
+#!/bin/bash
+python3 $1/mailbot.py -l $2 -c $3

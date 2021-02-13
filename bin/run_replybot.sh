@@ -1,4 +1,2 @@
-#!/usr/bin/bash
-pwd=`pwd`
-echo $pwd
-python3 $pwd/replybot.py -l $1 -c $2
+#!/bin/bash
+python3 $1/replybot.py -l $2 -c $3
