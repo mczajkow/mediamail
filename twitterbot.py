@@ -242,8 +242,9 @@ class TwitterBot(StreamListener):
         url = None
         if 'id_str' in tweetData:
             url = 'https://twitter.com/x/status/' + tweetData['id_str']
-        log.debug('Creating Elastic Search data')
-        elasticSearchDictionary = self.elasticSearchHelper.createRecord(authorName, authorLocation, screenName, createdAt, hashtags, localityConfidence, location, placeName, placeFullName, textB.sentiment.polarity, references, 'twitter', sentiment, textB.sentiment.subjectivity, tweetText, tokens, url)        
+        log.debug('Creating Elastic Search data. Locality confidence is: '+str(localityConfidence))
+        elasticSearchDictionary = self.elasticSearchHelper.createRecord(authorName, authorLocation, screenName, createdAt, hashtags, location, localityConfidence, placeName, placeFullName, textB.sentiment.polarity, references, 'twitter', sentiment, textB.sentiment.subjectivity, tweetText, tokens, url)
+        log.debug('Data record is: ' + str(elasticSearchDictionary))
         # Filter out low scoring records.
         if 'filters' in self.conf and 'minimum_score' in self.conf['filters']:
             log.debug('Now scoring the data record to see if it meets minimum scoring criteria')

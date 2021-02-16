@@ -133,12 +133,12 @@ class ElasticSearchHelper:
         if localityConfidence is not None:
             lC = 0.0
             try:
-                lC = float(locatlityConfidence)
-            except:
+                lC = float(localityConfidence)
+            except Exception as e:
                 # Not a number?
-                log.debug('Provided data has a locality confidence that is not a float. Ignoring.')
+                log.debug('Provided data has a locality confidence that is not a float. Ignoring. Reason: '+str(e))
                 return
-            if lC < 0.0 or lc > 1.0:
+            if lC < 0.0 or lC > 1.0:
                 log.debug('Provided data has a locality confidence that is not between 0.0 and 1.0 inclusive. Ignoring.')
                 return
             body['locality_confidence'] = lC
@@ -282,7 +282,6 @@ class ElasticSearchHelper:
         log.debug('Inserting into Elastic Search this record: ' + str(elasticSearchDictionary))
         try:
             self.elasticSearch.index(index=self.elasticSearchIndex,
-                     doc_type="test-type",
                      body=elasticSearchDictionary)
         except Exception as e:
             log.error("Could not index in Elastic Search: " + str(e))
