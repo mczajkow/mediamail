@@ -139,7 +139,8 @@ class TwitterBot(StreamListener):
         # This could be None, check.
         if tweetText is None:
             # It would be difficult to process a tweet with no text, so ignore that too.
-            log.warning('Incoming data from Twitter had no text in the tweet. Ignoring')
+            # This can happen if the tweet is a delete statement or anything else.
+            log.debug('Incoming tweetData had None for text. Could be a delete message. Ignoring.')
             return
         log.debug('Incoming tweet, text: ' + str(tweetText))        
         # Reset the self.twitterErrorCounter to zero. We have something that is good.

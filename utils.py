@@ -425,15 +425,11 @@ class TwitterHelper:
         elif 'retweeted_status' in tweetData:
             # Retweets have their text data somewhere else.
             if 'extended_tweet' in tweetData['retweeted_status'] and 'full_text' in tweetData['retweeted_status']['extended_tweet']:
-                return tweetData['retweeted_status']['extended_tweet']['full_text']
+                return tweetData['retweeted_status']['extended_tweet']['full_text']            
         # Otherwise, try just 'text' at the top level.
-        try:
-            return tweetData['text']
-        except Exception as e:
-            # Some kind of error in getting the data.
-            log.warning('Failed to find the text in the tweet because of an error: ' + str(e))
-            return None
-        log.info('Tweet contains no text that could be found.')
+        elif 'text' in tweetData:
+            return tweetData['text']          
+        # Else... it could be delete. Ignore whatever it is and return None.
         return None
     
     def localityCheckOfATweet(self, tweetData):
